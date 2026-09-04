@@ -1,21 +1,39 @@
 {
+  "id": "/guitar-tuner/",
   "name": "Gitaar Stemmer",
-  "short_name": "Stemmer",
-  "start_url": "./index.html",
+  "short_name": "Gitaar Stemmer",
+  "description": "Automatische gitaarstemmer voor gitaarsnaren E A D G B E",
+  "start_url": "/guitar-tuner/",
+  "scope": "/guitar-tuner/",
   "display": "standalone",
-  "background_color": "#10131a",
-  "theme_color": "#10131a",
+  "display_override": ["standalone", "window-controls-overlay"],
+  "background_color": "#0e1117",
+  "theme_color": "#0e1117",
   "orientation": "portrait",
   "icons": [
     {
       "src": "icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

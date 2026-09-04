@@ -27,11 +27,19 @@
       margin: 0;
       padding: 0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+    html, body {
+      overscroll-behavior: none;
+      touch-action: manipulation;
     }
     body {
       background-color: var(--bg);
       color: var(--text);
       min-height: 100vh;
+      min-height: 100dvh;
       display: flex;
       justify-content: center;
       align-items: center;
@@ -528,6 +536,15 @@
     <button id="startBtn" class="btn-start">
       <span id="btnIcon">🎤</span> <span id="btnText">Start Microfoon</span>
     </button>
+
+    <button id="pwaInstallBtn" style="display:none; width:100%; margin-top:10px; padding:12px; font-size:14px; font-weight:700; border-radius:12px; background:rgba(59,130,246,0.15); border:1px solid rgba(59,130,246,0.4); color:#93c5fd; cursor:pointer;">
+      📲 Installeer als Standalone App op Telefoon
+    </button>
+
+    <div id="browserNotice" style="display:none; margin-top:12px; padding:10px; border-radius:10px; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.3); color:#fde68a; font-size:12px; line-height:1.4;">
+      ℹ️ <strong>Je zit in de Discord-browser.</strong><br>Tik rechtsboven op de drie puntjes <strong>(⋮)</strong> en kies <em>"Openen in Chrome"</em> om hem als echte app te installeren.
+    </div>
+
     <div id="errorBox"></div>
   </div>
 
@@ -814,6 +831,7 @@
               needle.className = 'needle in-tune';
               statusBadge.textContent = '✓ ZUIVER GESTEMD!';
               statusBadge.className = 'status-badge in-tune';
+              if (navigator.vibrate && !lastWasInTune) navigator.vibrate(40);
             } else if (cents < 0) {
               needle.className = 'needle off-tune';
               statusBadge.textContent = '▲ TE LAAG (Draai vaster omhoog)';
@@ -823,6 +841,7 @@
               statusBadge.textContent = '▼ TE HOOG (Draai losser omlaag)';
               statusBadge.className = 'status-badge too-high';
             }
+            lastWasInTune = inTune;
 
             updateVisualHeadstock(targetString.id, inTune);
           }
@@ -864,6 +883,32 @@
         if (strLineEl) strLineEl.className.baseVal = 'string-line';
       });
     }
+
+    let lastWasInTune = false;
+
+    // Detecteer Discord WebView
+    if (navigator.userAgent.includes('Discord') || navigator.userAgent.includes('wv')) {
+      document.getElementById('browserNotice').style.display = 'block';
+    }
+
+    // PWA Installeren
+    let deferredPrompt = null;
+    const pwaInstallBtn = document.getElementById('pwaInstallBtn');
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      pwaInstallBtn.style.display = 'block';
+    });
+
+    pwaInstallBtn.addEventListener('click', async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') pwaInstallBtn.style.display = 'none';
+        deferredPrompt = null;
+      }
+    });
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js').catch(err => console.log('SW error:', err));
