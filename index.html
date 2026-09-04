@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0e1117">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="icon" type="image/png" href="icon-192.png">
+  <title>Gitaar Stemmer (Auto Detect)</title>
+  <style>
+    :root {
+      --bg: #0e1117;
+      --card: #161b26;
+      --card-inner: #1c2331;
+      --text: #f0f4fc;
+      --text-dim: #8b9bb4;
+      --accent: #3b82f6;
+      --accent-glow: rgba(59, 130, 246, 0.4);
+      --green: #10b981;
+      --green-glow: rgba(16, 185, 129, 0.6);
+      --red: #ef4444;
+      --yellow: #f59e0b;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 12px;
+    }
+    .app-container {
+      width: 100%;
+      max-width: 430px;
+      background: var(--card);
+      border-radius: 24px;
+      padding: 18px;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.6);
+      text-align: center;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    header {
+      margin-bottom: 12px;
+    }
+    header h1 {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .subtitle {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+
+    /* Headstock Visual */
+    .headstock-card {
+      background: var(--card-inner);
+      border-radius: 18px;
+      padding: 10px 8px 6px;
+      margin-bottom: 14px;
+      border: 1px solid rgba(255,255,255,0.05);
+      position: relative;
+    }
+    .headstock-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+      margin-bottom: 4px;
+      display: flex;
+      justify-content: space-between;
+      padding: 0 8px;
+    }
+    .headstock-title span.mode-tag {
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+      padding: 1px 8px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 10px;
+    }
+    .headstock-svg {
+      width: 100%;
+      max-width: 320px;
+      height: auto;
+      margin: 0 auto;
+      display: block;
+    }
+
+    /* SVG Tuning Pegs & Strings */
+    .peg-group {
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .peg-box {
+      fill: #222938;
+      stroke: #3b455b;
+      stroke-width: 1.5;
+      rx: 6;
+      transition: all 0.25s ease;
+    }
+    .peg-text-num {
+      fill: #8b9bb4;
+      font-size: 10px;
+      font-weight: 600;
+      text-anchor: middle;
+      dominant-baseline: central;
+    }
+    .peg-text-note {
+      fill: #ffffff;
+      font-size: 12px;
+      font-weight: 800;
+      text-anchor: middle;
+      dominant-baseline: central;
+    }
+    .peg-group.active .peg-box {
+      fill: #1d3557;
+      stroke: var(--accent);
+      stroke-width: 2.5;
+      filter: drop-shadow(0 0 6px var(--accent-glow));
+    }
+    .peg-group.active .peg-text-note {
+      fill: #60a5fa;
+    }
+    .peg-group.in-tune .peg-box {
+      fill: #064e3b;
+      stroke: var(--green);
+      stroke-width: 2.5;
+      filter: drop-shadow(0 0 10px var(--green-glow));
+    }
+    .peg-group.in-tune .peg-text-note {
+      fill: var(--green);
+    }
+    .string-line {
+      stroke: #4b5563;
+      stroke-linecap: round;
+      transition: all 0.25s ease;
+    }
+    .string-line.active {
+      stroke: #60a5fa;
+      stroke-width: 3.2 !important;
+      filter: drop-shadow(0 0 5px var(--accent-glow));
+    }
+    .string-line.in-tune {
+      stroke: var(--green);
+      stroke-width: 3.8 !important;
+      filter: drop-shadow(0 0 8px var(--green-glow));
+    }
+
+    /* Stemmeter */
+    .meter-container {
+      background: rgba(0, 0, 0, 0.35);
+      border-radius: 18px;
+      padding: 14px 12px 10px;
+      margin-bottom: 14px;
+      position: relative;
+      border: 1px solid rgba(255,255,255,0.04);
+    }
+    .meter-scale {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-dim);
+      margin-bottom: 6px;
+      padding: 0 10px;
+    }
+    .scale-mark.center {
+      color: var(--green);
+      font-weight: 800;
+    }
+    .needle-box {
+      width: 100%;
+      height: 80px;
+      position: relative;
+      overflow: hidden;
+    }
+    .target-zone {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 18px;
+      height: 100%;
+      background: rgba(16, 185, 129, 0.18);
+      border-radius: 4px;
+      border-left: 1px dashed rgba(16, 185, 129, 0.4);
+      border-right: 1px dashed rgba(16, 185, 129, 0.4);
+    }
+    .needle {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      width: 4px;
+      height: 72px;
+      background: var(--yellow);
+      transform-origin: bottom center;
+      transform: rotate(0deg);
+      transition: transform 0.06s ease-out, background-color 0.15s;
+      border-radius: 2px 2px 0 0;
+      box-shadow: 0 0 8px rgba(245, 158, 11, 0.7);
+    }
+    .needle.in-tune {
+      background: var(--green);
+      box-shadow: 0 0 14px rgba(16, 185, 129, 0.95);
+      width: 5px;
+    }
+    .needle.off-tune {
+      background: var(--red);
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.7);
+    }
+    .needle-pivot {
+      position: absolute;
+      bottom: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 14px;
+      height: 14px;
+      background: #ffffff;
+      border-radius: 50%;
+      z-index: 2;
+    }
+    .cents-label {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-dim);
+      margin-top: 6px;
+    }
+
+    /* Readout Card */
+    .readout-card {
+      padding: 12px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.03);
+      margin-bottom: 14px;
+      border: 1px solid rgba(255,255,255,0.04);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .string-detected-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #60a5fa;
+      margin-bottom: 2px;
+      letter-spacing: 0.5px;
+    }
+    .note-display {
+      font-size: 52px;
+      font-weight: 900;
+      line-height: 1;
+      color: #ffffff;
+      letter-spacing: -1.5px;
+    }
+    .freq-info-row {
+      display: flex;
+      gap: 16px;
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+    }
+    .freq-info-row span strong {
+      color: #ffffff;
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 5px 14px;
+      border-radius: 20px;
+      background: rgba(255,255,255,0.08);
+      color: var(--text-dim);
+      transition: all 0.2s;
+    }
+    .status-badge.in-tune {
+      background: rgba(16, 185, 129, 0.25);
+      color: var(--green);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+    .status-badge.too-low {
+      background: rgba(245, 158, 11, 0.25);
+      color: var(--yellow);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+    }
+    .status-badge.too-high {
+      background: rgba(239, 68, 68, 0.25);
+      color: var(--red);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+
+    /* Live Volume VU-meter */
+    .vu-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 8px 12px;
+      border-radius: 12px;
+      margin-bottom: 12px;
+    }
+    .vu-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-dim);
+      min-width: 50px;
+      text-align: left;
+    }
+    .vu-bar-bg {
+      flex: 1;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .vu-bar-fill {
+      width: 0%;
+      height: 100%;
+      background: var(--green);
+      border-radius: 4px;
+      transition: width 0.05s ease-out;
+    }
+
+    /* Start Button */
+    .btn-start {
+      width: 100%;
+      padding: 14px;
+      font-size: 16px;
+      font-weight: 800;
+      border: none;
+      border-radius: 14px;
+      background: var(--accent);
+      color: #ffffff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 14px rgba(59, 130, 246, 0.35);
+      transition: background-color 0.2s, transform 0.1s;
+    }
+    .btn-start:hover {
+      background: #2563eb;
+    }
+    .btn-start:active {
+      transform: scale(0.98);
+    }
+    .btn-start.active {
+      background: #dc2626;
+      box-shadow: 0 4px 14px rgba(220, 38, 38, 0.35);
+    }
+    #errorBox {
+      display: none;
+      margin-top: 12px;
+      padding: 10px 14px;
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid var(--red);
+      border-radius: 10px;
+      color: #fca5a5;
+      font-size: 12px;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <header>
+      <h1>🎸 Gitaar Stemmer</h1>
+      <p class="subtitle">Automatische snaardetectie & realtime microfooninput</p>
+    </header>
+
+    <!-- Headstock Visual -->
+    <div class="headstock-card">
+      <div class="headstock-title">
+        <span>Gitaarkop</span>
+        <span class="mode-tag" id="modeTag">AUTO DETECT</span>
+      </div>
+
+      <svg class="headstock-svg" viewBox="0 0 320 185" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="headstockWood" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#3a2a20"/>
+            <stop offset="50%" stop-color="#261b14"/>
+            <stop offset="100%" stop-color="#19110c"/>
+          </linearGradient>
+          <linearGradient id="nutGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#d9cfbf"/>
+            <stop offset="50%" stop-color="#f5efe6"/>
+            <stop offset="100%" stop-color="#d9cfbf"/>
+          </linearGradient>
+        </defs>
+
+        <!-- Gitaarhals aanzet onderaan -->
+        <path d="M 120 185 L 120 160 L 200 160 L 200 185 Z" fill="#261b14" stroke="#4a382c" stroke-width="1.5"/>
+
+        <!-- De Topkam (Nut) -->
+        <rect x="116" y="152" width="88" height="8" rx="2" fill="url(#nutGrad)" stroke="#8c7a6b" stroke-width="1"/>
+
+        <!-- Gitaarkop Contour -->
+        <path d="M 120 152 
+                 C 110 130, 95 105, 95 65 
+                 C 95 30, 120 20, 140 28 
+                 C 150 32, 160 32, 170 28 
+                 C 190 20, 225 30, 225 65 
+                 C 225 105, 210 130, 200 152 Z" 
+              fill="url(#headstockWood)" 
+              stroke="#5a4537" 
+              stroke-width="2.5" 
+              filter="drop-shadow(0 6px 12px rgba(0,0,0,0.5))"/>
+
+        <!-- Subtiel merk-inleg detail -->
+        <path d="M 152 48 L 160 40 L 168 48 L 160 56 Z" fill="#ffffff" opacity="0.12"/>
+
+        <!-- Snaren -->
+        <line id="string-E2" class="string-line" x1="126" y1="152" x2="105" y2="128" stroke-width="2.4"/>
+        <line id="string-A2" class="string-line" x1="138" y1="152" x2="105" y2="88" stroke-width="2.0"/>
+        <line id="string-D3" class="string-line" x1="150" y1="152" x2="105" y2="48" stroke-width="1.7"/>
+        <line id="string-G3" class="string-line" x1="170" y1="152" x2="215" y2="48" stroke-width="1.4"/>
+        <line id="string-B3" class="string-line" x1="182" y1="152" x2="215" y2="88" stroke-width="1.2"/>
+        <line id="string-E4" class="string-line" x1="194" y1="152" x2="215" y2="128" stroke-width="1.0"/>
+
+        <!-- Stemmechanieken posts -->
+        <circle cx="105" cy="128" r="4.5" fill="#a0aec0" stroke="#4a5568" stroke-width="1.5"/>
+        <circle cx="105" cy="88" r="4.5" fill="#a0aec0" stroke="#4a5568" stroke-width="1.5"/>
+        <circle cx="105" cy="48" r="4.5" fill="#a0aec0" stroke="#4a5568" stroke-width="1.5"/>
+        <circle cx="215" cy="48" r="4.5" fill="#a0aec0" stroke="#4a5568" stroke-width="1.5"/>
+        <circle cx="215" cy="88" r="4.5" fill="#a0aec0" stroke="#4a5568" stroke-width="1.5"/>
+        <circle cx="215" cy="128" r="4.5" fill="#a0aec0" stroke="#4a5568" stroke-width="1.5"/>
+
+        <!-- LINKER STEMSLEUTELS (Snaar 4 D3, Snaar 5 A2, Snaar 6 E2) -->
+        <g id="peg-D3" class="peg-group" data-string="D3">
+          <line x1="105" y1="48" x2="70" y2="48" stroke="#718096" stroke-width="3"/>
+          <rect class="peg-box" x="14" y="32" width="60" height="32"/>
+          <text class="peg-text-num" x="30" y="48">4</text>
+          <text class="peg-text-note" x="52" y="48">D3</text>
+        </g>
+
+        <g id="peg-A2" class="peg-group" data-string="A2">
+          <line x1="105" y1="88" x2="70" y2="88" stroke="#718096" stroke-width="3"/>
+          <rect class="peg-box" x="14" y="72" width="60" height="32"/>
+          <text class="peg-text-num" x="30" y="88">5</text>
+          <text class="peg-text-note" x="52" y="88">A2</text>
+        </g>
+
+        <g id="peg-E2" class="peg-group" data-string="E2">
+          <line x1="105" y1="128" x2="70" y2="128" stroke="#718096" stroke-width="3"/>
+          <rect class="peg-box" x="14" y="112" width="60" height="32"/>
+          <text class="peg-text-num" x="30" y="128">6</text>
+          <text class="peg-text-note" x="52" y="128">E2</text>
+        </g>
+
+        <!-- RECHTER STEMSLEUTELS (Snaar 3 G3, Snaar 2 B3, Snaar 1 E4) -->
+        <g id="peg-G3" class="peg-group" data-string="G3">
+          <line x1="215" y1="48" x2="250" y2="48" stroke="#718096" stroke-width="3"/>
+          <rect class="peg-box" x="246" y="32" width="60" height="32"/>
+          <text class="peg-text-note" x="268" y="48">G3</text>
+          <text class="peg-text-num" x="290" y="48">3</text>
+        </g>
+
+        <g id="peg-B3" class="peg-group" data-string="B3">
+          <line x1="215" y1="88" x2="250" y2="88" stroke="#718096" stroke-width="3"/>
+          <rect class="peg-box" x="246" y="72" width="60" height="32"/>
+          <text class="peg-text-note" x="268" y="88">B3</text>
+          <text class="peg-text-num" x="290" y="88">2</text>
+        </g>
+
+        <g id="peg-E4" class="peg-group" data-string="E4">
+          <line x1="215" y1="128" x2="250" y2="128" stroke="#718096" stroke-width="3"/>
+          <rect class="peg-box" x="246" y="112" width="60" height="32"/>
+          <text class="peg-text-note" x="268" y="128">E4</text>
+          <text class="peg-text-num" x="290" y="128">1</text>
+        </g>
+      </svg>
+    </div>
+
+    <!-- Stemnaald & Meter -->
+    <div class="meter-container">
+      <div class="meter-scale">
+        <span class="scale-mark left">-50</span>
+        <span class="scale-mark left">-25</span>
+        <span class="scale-mark center">0 (ZUIVER)</span>
+        <span class="scale-mark right">+25</span>
+        <span class="scale-mark right">+50</span>
+      </div>
+      <div class="needle-box">
+        <div class="needle-pivot"></div>
+        <div class="needle" id="needle"></div>
+        <div class="target-zone"></div>
+      </div>
+      <div class="cents-label" id="centsLabel">0 cents</div>
+    </div>
+
+    <!-- Readout details -->
+    <div class="readout-card">
+      <div class="string-detected-title" id="stringTitle">SLA EEN SNAAR AAN</div>
+      <div class="note-display" id="noteDisplay">--</div>
+      <div class="freq-info-row">
+        <span>Gemeten: <strong id="freqCurrent">0.0 Hz</strong></span>
+        <span>Doel: <strong id="freqTarget">-- Hz</strong></span>
+      </div>
+      <div class="status-badge" id="statusBadge">Microfoon staat uit</div>
+    </div>
+
+    <!-- Live VU-meter (toont of geluid doorkomt) -->
+    <div class="vu-container">
+      <span class="vu-label">Mic Signaal:</span>
+      <div class="vu-bar-bg">
+        <div class="vu-bar-fill" id="vuBar"></div>
+      </div>
+      <span style="font-size: 10px; color: var(--text-dim);" id="vuVal">0%</span>
+    </div>
+
+    <button id="startBtn" class="btn-start">
+      <span id="btnIcon">🎤</span> <span id="btnText">Start Microfoon</span>
+    </button>
+    <div id="errorBox"></div>
+  </div>
+
+  <script>
+    window.onerror = function(msg, url, line) {
+      const box = document.getElementById('errorBox');
+      if (box) {
+        box.style.display = 'block';
+        box.textContent = 'Fout: ' + msg + ' (regel ' + line + ')';
+      }
+    };
+
+    const GUITAR_STRINGS = [
+      { id: 'E2', num: 6, note: 'E', octave: 2, freq: 82.41, label: 'Snaar 6: Lage E (E2)' },
+      { id: 'A2', num: 5, note: 'A', octave: 2, freq: 110.00, label: 'Snaar 5: A (A2)' },
+      { id: 'D3', num: 4, note: 'D', octave: 3, freq: 146.83, label: 'Snaar 4: D (D3)' },
+      { id: 'G3', num: 3, note: 'G', octave: 3, freq: 196.00, label: 'Snaar 3: G (G3)' },
+      { id: 'B3', num: 2, note: 'B', octave: 3, freq: 246.94, label: 'Snaar 2: B (B3)' },
+      { id: 'E4', num: 1, note: 'E', octave: 4, freq: 329.63, label: 'Snaar 1: Hoge E (E4)' }
+    ];
+
+    let audioContext = null;
+    let analyser = null;
+    let mediaStream = null;
+    let isRunning = false;
+    let animationId = null;
+
+    let currentLockedString = null;
+    let silenceCounter = 0;
+    let smoothedFreq = 0;
+
+    const startBtn = document.getElementById('startBtn');
+    const btnIcon = document.getElementById('btnIcon');
+    const btnText = document.getElementById('btnText');
+    const needle = document.getElementById('needle');
+    const centsLabel = document.getElementById('centsLabel');
+    const stringTitle = document.getElementById('stringTitle');
+    const noteDisplay = document.getElementById('noteDisplay');
+    const freqCurrent = document.getElementById('freqCurrent');
+    const freqTarget = document.getElementById('freqTarget');
+    const statusBadge = document.getElementById('statusBadge');
+    const vuBar = document.getElementById('vuBar');
+    const vuVal = document.getElementById('vuVal');
+    const pegGroups = document.querySelectorAll('.peg-group');
+
+    pegGroups.forEach(peg => {
+      peg.addEventListener('click', () => {
+        const strId = peg.getAttribute('data-string');
+        const strObj = GUITAR_STRINGS.find(s => s.id === strId);
+        if (strObj) {
+          currentLockedString = strObj;
+          updateVisualHeadstock(strObj.id, false);
+          stringTitle.textContent = 'VASTGEZET: ' + strObj.label;
+          freqTarget.textContent = strObj.freq.toFixed(1) + ' Hz';
+          noteDisplay.textContent = strObj.id;
+        }
+      });
+    });
+
+    startBtn.addEventListener('click', () => {
+      if (isRunning) {
+        stopTuner();
+      } else {
+        startTuner();
+      }
+    });
+
+    async function startTuner() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) throw new Error('Web Audio API niet ondersteund in deze browser');
+        
+        audioContext = new AudioCtx();
+        if (audioContext.state === 'suspended') {
+          await audioContext.resume();
+        }
+
+        // Probeer eerst pure audio (zonder speech filters), met fallback naar standaard audio
+        try {
+          mediaStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false
+            }
+          });
+        } catch (e) {
+          console.log('Fallback to standard audio constraint');
+          mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        }
+
+        // Dubbel check dat tracks actief zijn
+        const audioTracks = mediaStream.getAudioTracks();
+        if (audioTracks.length === 0) throw new Error('Geen microfoonspoor gevonden');
+        console.log('Audio track active:', audioTracks[0].label, audioTracks[0].enabled);
+
+        const source = audioContext.createMediaStreamSource(mediaStream);
+        analyser = audioContext.createAnalyser();
+        // 2048 is snel, ondersteund op alle telefoons en levert voldoende resolutie
+        analyser.fftSize = 2048;
+        source.connect(analyser);
+
+        isRunning = true;
+        btnIcon.textContent = '⏹';
+        btnText.textContent = 'Stop Stemmer';
+        startBtn.classList.add('active');
+        statusBadge.textContent = 'Microfoon actief! Sla een snaar aan';
+        statusBadge.className = 'status-badge';
+        stringTitle.textContent = 'AUTOMATISCHE DETECTIE ACTIEF';
+
+        updatePitch();
+      } catch (err) {
+        const box = document.getElementById('errorBox');
+        box.style.display = 'block';
+        box.textContent = 'Microfoontoegang mislukt: ' + err.message + ' (Controleer permissies)';
+      }
+    }
+
+    function stopTuner() {
+      isRunning = false;
+      if (animationId) cancelAnimationFrame(animationId);
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(t => t.stop());
+      }
+      if (audioContext) audioContext.close();
+
+      btnIcon.textContent = '🎤';
+      btnText.textContent = 'Start Microfoon';
+      startBtn.classList.remove('active');
+      statusBadge.textContent = 'Microfoon staat uit';
+      statusBadge.className = 'status-badge';
+      stringTitle.textContent = 'SLA EEN SNAAR AAN';
+      noteDisplay.textContent = '--';
+      freqCurrent.textContent = '0.0 Hz';
+      freqTarget.textContent = '-- Hz';
+      centsLabel.textContent = '0 cents';
+      needle.style.transform = 'rotate(0deg)';
+      needle.className = 'needle';
+      vuBar.style.width = '0%';
+      vuVal.textContent = '0%';
+      currentLockedString = null;
+      clearHeadstockVisual();
+    }
+
+    // YIN Pitch Detection Algoritme (De gouden standaard voor monophonic instrumenten)
+    function yinPitch(buffer, sampleRate, threshold = 0.15) {
+      const halfSize = Math.floor(buffer.length / 2);
+      const yinBuffer = new Float32Array(halfSize);
+
+      // Stap 1: Difference functie
+      for (let tau = 0; tau < halfSize; tau++) {
+        let sum = 0;
+        for (let i = 0; i < halfSize; i++) {
+          const delta = buffer[i] - buffer[i + tau];
+          sum += delta * delta;
+        }
+        yinBuffer[tau] = sum;
+      }
+
+      // Stap 2: Cumulative mean normalized difference
+      const cmndf = new Float32Array(halfSize);
+      cmndf[0] = 1;
+      let runningSum = 0;
+      for (let tau = 1; tau < halfSize; tau++) {
+        runningSum += yinBuffer[tau];
+        cmndf[tau] = runningSum > 0 ? (yinBuffer[tau] * tau) / runningSum : 1;
+      }
+
+      // Stap 3: Absolute threshold (vind eerste dip onder threshold)
+      const minTau = Math.floor(sampleRate / 450); // Max ~450 Hz
+      const maxTau = Math.min(Math.floor(sampleRate / 65), halfSize - 1);  // Min ~65 Hz
+
+      let chosenTau = -1;
+      for (let tau = minTau; tau <= maxTau; tau++) {
+        if (cmndf[tau] < threshold) {
+          while (tau + 1 < halfSize && cmndf[tau + 1] < cmndf[tau]) {
+            tau++;
+          }
+          chosenTau = tau;
+          break;
+        }
+      }
+
+      // Fallback: globaal minimum indien geen dip onder threshold maar wel duidelijke periodiciteit
+      if (chosenTau === -1) {
+        let bestTau = minTau;
+        let bestVal = cmndf[minTau];
+        for (let tau = minTau; tau <= maxTau; tau++) {
+          if (cmndf[tau] < bestVal) {
+            bestVal = cmndf[tau];
+            bestTau = tau;
+          }
+        }
+        if (bestVal < 0.35) {
+          chosenTau = bestTau;
+        } else {
+          return -1;
+        }
+      }
+
+      // Stap 4: Parabolische interpolatie voor sub-sample precisie
+      let betterTau = chosenTau;
+      if (chosenTau > 0 && chosenTau < halfSize - 1) {
+        const s0 = cmndf[chosenTau - 1];
+        const s1 = cmndf[chosenTau];
+        const s2 = cmndf[chosenTau + 1];
+        const denom = 2 * (2 * s1 - s2 - s0);
+        if (denom !== 0) {
+          betterTau = chosenTau + (s2 - s0) / denom;
+        }
+      }
+
+      return sampleRate / betterTau;
+    }
+
+    // Automatische snaardetectie
+    function detectNearestGuitarString(freq) {
+      let nearest = null;
+      let minDistanceCents = Infinity;
+
+      GUITAR_STRINGS.forEach(s => {
+        const centsDist = Math.abs(1200 * Math.log2(freq / s.freq));
+        if (centsDist < minDistanceCents) {
+          minDistanceCents = centsDist;
+          nearest = s;
+        }
+      });
+
+      // Binnen +/- 250 cents (~2.5 halve tonen) toewijzen aan snaar
+      if (minDistanceCents <= 250) {
+        return nearest;
+      }
+      return null;
+    }
+
+    function updatePitch() {
+      if (!isRunning) return;
+      const buffer = new Float32Array(analyser.fftSize);
+      analyser.getFloatTimeDomainData(buffer);
+
+      // Bereken RMS volume voor VU-meter
+      let sumSq = 0;
+      for (let i = 0; i < buffer.length; i++) {
+        sumSq += buffer[i] * buffer[i];
+      }
+      const rms = Math.sqrt(sumSq / buffer.length);
+      const vuPercent = Math.min(100, Math.round(rms * 400));
+      vuBar.style.width = vuPercent + '%';
+      vuVal.textContent = vuPercent + '%';
+
+      // Zeer lage drempel (0.004) zodat zelfs een zachte gitaaraanslag wordt opgepikt
+      if (rms >= 0.004) {
+        const rawFreq = yinPitch(buffer, audioContext.sampleRate);
+
+        if (rawFreq !== -1 && rawFreq >= 65 && rawFreq <= 450) {
+          silenceCounter = 0;
+
+          if (smoothedFreq === 0 || Math.abs(rawFreq - smoothedFreq) > 30) {
+            smoothedFreq = rawFreq;
+          } else {
+            smoothedFreq = smoothedFreq * 0.65 + rawFreq * 0.35;
+          }
+
+          const targetString = detectNearestGuitarString(smoothedFreq);
+
+          if (targetString) {
+            currentLockedString = targetString;
+            const targetFreqVal = targetString.freq;
+
+            const cents = Math.round(1200 * Math.log2(smoothedFreq / targetFreqVal));
+            const inTune = Math.abs(cents) <= 4;
+
+            stringTitle.textContent = targetString.label.toUpperCase();
+            noteDisplay.textContent = targetString.id;
+            freqCurrent.textContent = smoothedFreq.toFixed(1) + ' Hz';
+            freqTarget.textContent = targetFreqVal.toFixed(1) + ' Hz';
+            centsLabel.textContent = (cents > 0 ? '+' + cents : cents) + ' cents';
+
+            const clampedCents = Math.max(-50, Math.min(50, cents));
+            const angle = (clampedCents / 50) * 45;
+            needle.style.transform = 'rotate(' + angle + 'deg)';
+
+            if (inTune) {
+              needle.className = 'needle in-tune';
+              statusBadge.textContent = '✓ ZUIVER GESTEMD!';
+              statusBadge.className = 'status-badge in-tune';
+            } else if (cents < 0) {
+              needle.className = 'needle off-tune';
+              statusBadge.textContent = '▲ TE LAAG (Draai vaster omhoog)';
+              statusBadge.className = 'status-badge too-low';
+            } else {
+              needle.className = 'needle off-tune';
+              statusBadge.textContent = '▼ TE HOOG (Draai losser omlaag)';
+              statusBadge.className = 'status-badge too-high';
+            }
+
+            updateVisualHeadstock(targetString.id, inTune);
+          }
+        }
+      } else {
+        silenceCounter++;
+        if (silenceCounter > 35) {
+          smoothedFreq = 0;
+          if (currentLockedString) {
+            statusBadge.textContent = 'Wachten op aanslag...';
+            statusBadge.className = 'status-badge';
+          }
+        }
+      }
+
+      animationId = requestAnimationFrame(updatePitch);
+    }
+
+    function updateVisualHeadstock(activeStringId, inTune) {
+      GUITAR_STRINGS.forEach(s => {
+        const pegEl = document.getElementById('peg-' + s.id);
+        const strLineEl = document.getElementById('string-' + s.id);
+
+        if (s.id === activeStringId) {
+          if (pegEl) pegEl.className.baseVal = inTune ? 'peg-group in-tune' : 'peg-group active';
+          if (strLineEl) strLineEl.className.baseVal = inTune ? 'string-line in-tune' : 'string-line active';
+        } else {
+          if (pegEl) pegEl.className.baseVal = 'peg-group';
+          if (strLineEl) strLineEl.className.baseVal = 'string-line';
+        }
+      });
+    }
+
+    function clearHeadstockVisual() {
+      GUITAR_STRINGS.forEach(s => {
+        const pegEl = document.getElementById('peg-' + s.id);
+        const strLineEl = document.getElementById('string-' + s.id);
+        if (pegEl) pegEl.className.baseVal = 'peg-group';
+        if (strLineEl) strLineEl.className.baseVal = 'string-line';
+      });
+    }
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(err => console.log('SW error:', err));
+    }
+  </script>
+</body>
+</html>

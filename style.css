@@ -1,0 +1,241 @@
+:root {
+  --bg: #10131a;
+  --card: #181d28;
+  --text: #ffffff;
+  --text-dim: #8b9bb4;
+  --accent: #3b82f6;
+  --green: #10b981;
+  --red: #ef4444;
+  --yellow: #f59e0b;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+}
+
+.app-container {
+  width: 100%;
+  max-width: 420px;
+  background: var(--card);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  text-align: center;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+header h1 {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  letter-spacing: -0.5px;
+}
+
+.subtitle {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 20px;
+}
+
+/* Meter */
+.meter-container {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 16px;
+  padding: 18px;
+  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.meter-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+
+.scale-mark.center {
+  color: var(--green);
+  font-weight: 700;
+}
+
+.needle-box {
+  width: 100%;
+  height: 90px;
+  position: relative;
+  overflow: hidden;
+}
+
+.target-zone {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 100%;
+  background: rgba(16, 185, 129, 0.15);
+  border-radius: 4px;
+}
+
+.needle {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 3px;
+  height: 80px;
+  background: var(--yellow);
+  transform-origin: bottom center;
+  transform: rotate(0deg);
+  transition: transform 0.08s ease-out, background-color 0.15s;
+  border-radius: 2px 2px 0 0;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+}
+
+.needle.in-tune {
+  background: var(--green);
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.9);
+}
+
+.needle.off-tune {
+  background: var(--red);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+}
+
+.needle-pivot {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 14px;
+  background: #ffffff;
+  border-radius: 50%;
+  z-index: 2;
+}
+
+.cents-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-top: 8px;
+}
+
+/* Readout */
+.readout-card {
+  padding: 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  margin-bottom: 20px;
+}
+
+.note-display {
+  font-size: 64px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--text);
+  margin-bottom: 4px;
+  letter-spacing: -2px;
+}
+
+.freq-display {
+  font-size: 16px;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+
+.status-badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.08);
+  color: var(--text-dim);
+}
+
+.status-badge.in-tune {
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--green);
+}
+
+.status-badge.too-low {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--yellow);
+}
+
+.status-badge.too-high {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--red);
+}
+
+/* Strings guide */
+.strings-guide {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.string-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 8px 4px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.04);
+  color: var(--text-dim);
+  transition: all 0.2s;
+  border: 1px solid transparent;
+}
+
+.string-badge.active {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.5);
+  font-weight: 700;
+}
+
+.string-badge.in-tune {
+  background: rgba(16, 185, 129, 0.25);
+  color: var(--green);
+  border-color: rgba(16, 185, 129, 0.6);
+}
+
+/* Button */
+.btn-start {
+  width: 100%;
+  padding: 14px;
+  font-size: 16px;
+  font-weight: 700;
+  border: none;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #ffffff;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.btn-start:hover {
+  background: #2563eb;
+}
+
+.btn-start:active {
+  transform: scale(0.98);
+}
+
+.btn-start.active {
+  background: #dc2626;
+}
