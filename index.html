@@ -584,6 +584,14 @@
     let currentLockedString = null;
     let silenceCounter = 0;
     let smoothedFreq = 0;
+    let biquadHighpass = null;
+    let biquadLowpass = null;
+    let freqHistory = [];
+    const FREQ_HISTORY_SIZE = 5;
+    let smoothNeedleAngle = 0;
+    let pendingCandidateString = null;
+    let pendingCandidateCount = 0;
+    const STRING_SWITCH_FRAMES = 4;
 
     const startBtn = document.getElementById('startBtn');
     const btnIcon = document.getElementById('btnIcon');
@@ -666,12 +674,24 @@
         gainNode = audioContext.createGain();
         gainNode.gain.value = currentGain;
 
+        // Biquad Highpass: blokkeer laag gerommel, wind en 50Hz netbrom
+        biquadHighpass = audioContext.createBiquadFilter();
+        biquadHighpass.type = 'highpass';
+        biquadHighpass.frequency.value = 65;
+
+        // Biquad Lowpass: snijd hoge ruis en sissende boventonen boven 420 Hz af
+        biquadLowpass = audioContext.createBiquadFilter();
+        biquadLowpass.type = 'lowpass';
+        biquadLowpass.frequency.value = 420;
+
         analyser = audioContext.createAnalyser();
         analyser.fftSize = 2048;
 
-        // Koppel audio-keten: Mic -> GainNode (boost) -> Analyser
+        // Koppel audio-keten: Mic -> GainNode (boost) -> Highpass (65Hz) -> Lowpass (420Hz) -> Analyser
         source.connect(gainNode);
-        gainNode.connect(analyser);
+        gainNode.connect(biquadHighpass);
+        biquadHighpass.connect(biquadLowpass);
+        biquadLowpass.connect(analyser);
 
         isRunning = true;
         btnIcon.textContent = '⏹';
@@ -696,6 +716,14 @@
         mediaStream.getTracks().forEach(t => t.stop());
       }
       if (audioContext) audioContext.close();
+      biquadHighpass = null;
+      biquadLowpass = null;
+      gainNode = null;
+      freqHistory = [];
+      smoothedFreq = 0;
+      smoothNeedleAngle = 0;
+      pendingCandidateString = null;
+      pendingCandidateCount = 0;
 
       btnIcon.textContent = '🎤';
       btnText.textContent = 'Start Microfoon';
@@ -764,7 +792,7 @@
             bestTau = tau;
           }
         }
-        if (bestVal < 0.35) {
+        if (bestVal < 0.22) {
           chosenTau = bestTau;
         } else {
           return -1;
@@ -786,22 +814,47 @@
       return sampleRate / betterTau;
     }
 
-    // Automatische snaardetectie
+    function calculateMedian(arr) {
+      if (!arr || arr.length === 0) return 0;
+      const sorted = [...arr].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+    }
+
+    // Automatische snaardetectie met harmonische herkenning (octaaf-veilig voor Lage E en A)
     function detectNearestGuitarString(freq) {
       let nearest = null;
       let minDistanceCents = Infinity;
+      let isOctaveMatch = false;
 
       GUITAR_STRINGS.forEach(s => {
-        const centsDist = Math.abs(1200 * Math.log2(freq / s.freq));
-        if (centsDist < minDistanceCents) {
-          minDistanceCents = centsDist;
+        // Grondtoon afstand
+        const dist0 = Math.abs(1200 * Math.log2(freq / s.freq));
+        
+        // 2e harmonische afstand (vooral relevant voor E2 en A2 op telefoons met zwakke bas-microfoon)
+        const distOct = (s.id === 'E2' || s.id === 'A2')
+          ? Math.abs(1200 * Math.log2(freq / (s.freq * 2)))
+          : Infinity;
+
+        if (dist0 < minDistanceCents) {
+          minDistanceCents = dist0;
           nearest = s;
+          isOctaveMatch = false;
+        }
+        if (distOct < minDistanceCents) {
+          minDistanceCents = distOct;
+          nearest = s;
+          isOctaveMatch = true;
         }
       });
 
-      // Binnen +/- 250 cents (~2.5 halve tonen) toewijzen aan snaar
-      if (minDistanceCents <= 250) {
-        return nearest;
+      // Binnen +/- 220 cents toewijzen aan snaar
+      if (minDistanceCents <= 220 && nearest) {
+        return {
+          string: nearest,
+          isOctave: isOctaveMatch,
+          targetFreq: isOctaveMatch ? nearest.freq * 2 : nearest.freq
+        };
       }
       return null;
     }
@@ -821,37 +874,73 @@
       vuBar.style.width = vuPercent + '%';
       vuVal.textContent = vuPercent + '%';
 
-      // Zeer lage drempel (0.004) zodat zelfs een zachte gitaaraanslag wordt opgepikt
-      if (rms >= 0.004) {
+      // Noise gate: start detectie bij voldoende signaalsterkte boven achtergrondruis
+      if (rms >= 0.007) {
         const rawFreq = yinPitch(buffer, audioContext.sampleRate);
 
         if (rawFreq !== -1 && rawFreq >= 65 && rawFreq <= 450) {
           silenceCounter = 0;
 
-          if (smoothedFreq === 0 || Math.abs(rawFreq - smoothedFreq) > 30) {
-            smoothedFreq = rawFreq;
+          // Voeg toe aan mediaanfilter buffer
+          freqHistory.push(rawFreq);
+          if (freqHistory.length > FREQ_HISTORY_SIZE) {
+            freqHistory.shift();
+          }
+          const medianFreq = calculateMedian(freqHistory);
+
+          // Vloeiende frequentie-interpolatie (Smoothing)
+          if (smoothedFreq === 0) {
+            smoothedFreq = medianFreq;
           } else {
-            smoothedFreq = smoothedFreq * 0.65 + rawFreq * 0.35;
+            smoothedFreq = smoothedFreq * 0.70 + medianFreq * 0.30;
           }
 
-          const targetString = detectNearestGuitarString(smoothedFreq);
+          const match = detectNearestGuitarString(smoothedFreq);
 
-          if (targetString) {
-            currentLockedString = targetString;
-            const targetFreqVal = targetString.freq;
+          if (match) {
+            const detectedString = match.string;
+
+            // Hysteresis / Lock-on: vereist meerdere opeenvolgende frames om van snaar te wisselen
+            if (!currentLockedString) {
+              currentLockedString = detectedString;
+              pendingCandidateString = null;
+              pendingCandidateCount = 0;
+            } else if (currentLockedString.id !== detectedString.id) {
+              if (pendingCandidateString && pendingCandidateString.id === detectedString.id) {
+                pendingCandidateCount++;
+                if (pendingCandidateCount >= STRING_SWITCH_FRAMES) {
+                  currentLockedString = detectedString;
+                  pendingCandidateString = null;
+                  pendingCandidateCount = 0;
+                }
+              } else {
+                pendingCandidateString = detectedString;
+                pendingCandidateCount = 1;
+              }
+            } else {
+              pendingCandidateString = null;
+              pendingCandidateCount = 0;
+            }
+
+            const activeString = currentLockedString;
+            const targetFreqVal = match.isOctave && (activeString.id === 'E2' || activeString.id === 'A2')
+              ? activeString.freq * 2
+              : activeString.freq;
 
             const cents = Math.round(1200 * Math.log2(smoothedFreq / targetFreqVal));
             const inTune = Math.abs(cents) <= 4;
 
-            stringTitle.textContent = targetString.label.toUpperCase();
-            noteDisplay.textContent = targetString.id;
-            freqCurrent.textContent = smoothedFreq.toFixed(1) + ' Hz';
-            freqTarget.textContent = targetFreqVal.toFixed(1) + ' Hz';
+            stringTitle.textContent = activeString.label.toUpperCase();
+            noteDisplay.textContent = activeString.id;
+            freqCurrent.textContent = (match.isOctave ? (smoothedFreq / 2) : smoothedFreq).toFixed(1) + ' Hz';
+            freqTarget.textContent = activeString.freq.toFixed(1) + ' Hz';
             centsLabel.textContent = (cents > 0 ? '+' + cents : cents) + ' cents';
 
+            // Analoge naald-demping (EWMA) voor een rustig reagerende meter
             const clampedCents = Math.max(-50, Math.min(50, cents));
-            const angle = (clampedCents / 50) * 45;
-            needle.style.transform = 'rotate(' + angle + 'deg)';
+            const targetAngle = (clampedCents / 50) * 45;
+            smoothNeedleAngle = smoothNeedleAngle * 0.75 + targetAngle * 0.25;
+            needle.style.transform = 'rotate(' + smoothNeedleAngle.toFixed(1) + 'deg)';
 
             if (inTune) {
               needle.className = 'needle in-tune';
@@ -869,13 +958,19 @@
             }
             lastWasInTune = inTune;
 
-            updateVisualHeadstock(targetString.id, inTune);
+            updateVisualHeadstock(activeString.id, inTune);
           }
         }
       } else {
         silenceCounter++;
-        if (silenceCounter > 35) {
+        if (silenceCounter > 25) {
+          freqHistory = [];
           smoothedFreq = 0;
+          // Laat naald rustig naar het midden zakken
+          smoothNeedleAngle = smoothNeedleAngle * 0.85;
+          if (Math.abs(smoothNeedleAngle) > 0.5) {
+            needle.style.transform = 'rotate(' + smoothNeedleAngle.toFixed(1) + 'deg)';
+          }
           if (currentLockedString) {
             statusBadge.textContent = 'Wachten op aanslag...';
             statusBadge.className = 'status-badge';
