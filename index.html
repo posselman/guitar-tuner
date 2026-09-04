@@ -526,11 +526,18 @@
 
     <!-- Live VU-meter (toont of geluid doorkomt) -->
     <div class="vu-container">
-      <span class="vu-label">Mic Signaal:</span>
+      <span class="vu-label">Signaal:</span>
       <div class="vu-bar-bg">
         <div class="vu-bar-fill" id="vuBar"></div>
       </div>
-      <span style="font-size: 10px; color: var(--text-dim);" id="vuVal">0%</span>
+      <span style="font-size: 11px; font-weight: 700; color: var(--text-dim);" id="vuVal">0%</span>
+    </div>
+
+    <!-- Gevoeligheid / Gain Slider -->
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; padding: 0 4px; font-size: 12px; color: var(--text-dim);">
+      <span>Gevoeligheid:</span>
+      <input type="range" id="gainSlider" min="1" max="30" value="8" step="1" style="flex: 1; accent-color: var(--accent); cursor: pointer;">
+      <span id="gainVal" style="min-width: 32px; font-weight: 800; color: #60a5fa;">8x</span>
     </div>
 
     <button id="startBtn" class="btn-start">
@@ -568,6 +575,8 @@
 
     let audioContext = null;
     let analyser = null;
+    let gainNode = null;
+    let currentGain = 8.0;
     let mediaStream = null;
     let isRunning = false;
     let animationId = null;
@@ -588,7 +597,17 @@
     const statusBadge = document.getElementById('statusBadge');
     const vuBar = document.getElementById('vuBar');
     const vuVal = document.getElementById('vuVal');
+    const gainSlider = document.getElementById('gainSlider');
+    const gainVal = document.getElementById('gainVal');
     const pegGroups = document.querySelectorAll('.peg-group');
+
+    if (gainSlider) {
+      gainSlider.addEventListener('input', (e) => {
+        currentGain = parseFloat(e.target.value);
+        if (gainVal) gainVal.textContent = currentGain + 'x';
+        if (gainNode) gainNode.gain.value = currentGain;
+      });
+    }
 
     pegGroups.forEach(peg => {
       peg.addEventListener('click', () => {
@@ -622,13 +641,13 @@
           await audioContext.resume();
         }
 
-        // Probeer eerst pure audio (zonder speech filters), met fallback naar standaard audio
+        // Vraag microfoon aan met autoGainControl actief
         try {
           mediaStream = await navigator.mediaDevices.getUserMedia({
             audio: {
               echoCancellation: false,
               noiseSuppression: false,
-              autoGainControl: false
+              autoGainControl: true
             }
           });
         } catch (e) {
@@ -642,10 +661,17 @@
         console.log('Audio track active:', audioTracks[0].label, audioTracks[0].enabled);
 
         const source = audioContext.createMediaStreamSource(mediaStream);
+        
+        // Software GainNode voor instelbare microfoonversterking
+        gainNode = audioContext.createGain();
+        gainNode.gain.value = currentGain;
+
         analyser = audioContext.createAnalyser();
-        // 2048 is snel, ondersteund op alle telefoons en levert voldoende resolutie
         analyser.fftSize = 2048;
-        source.connect(analyser);
+
+        // Koppel audio-keten: Mic -> GainNode (boost) -> Analyser
+        source.connect(gainNode);
+        gainNode.connect(analyser);
 
         isRunning = true;
         btnIcon.textContent = '⏹';
