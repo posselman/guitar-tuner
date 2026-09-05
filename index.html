@@ -389,7 +389,7 @@
   <div class="app-container">
     <header>
       <h1>🎸 Gitaar Stemmer</h1>
-      <p class="subtitle">Automatische snaardetectie & realtime microfooninput <span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:6px; background:rgba(59,130,246,0.18); border:1px solid rgba(59,130,246,0.35); color:#93c5fd; font-size:10px; font-weight:700; vertical-align:middle;">Build 20260905.6</span></p>
+      <p class="subtitle">Automatische snaardetectie & realtime microfooninput <span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:6px; background:rgba(59,130,246,0.18); border:1px solid rgba(59,130,246,0.35); color:#93c5fd; font-size:10px; font-weight:700; vertical-align:middle;">Build 20260905.7</span></p>
     </header>
 
     <!-- Headstock Visual -->
@@ -612,7 +612,7 @@
     </details>
 
     <footer style="margin-top:14px; font-size:11px; color:var(--text-dim); opacity:0.75;">
-      Versie 1.3.0 • Build 20260905.6 (Debug & Stability Diagnostics)
+      Versie 1.3.0 • Build 20260905.7 (Debug & Stability Diagnostics)
     </footer>
 
     <div id="errorBox"></div>
@@ -1017,14 +1017,15 @@
       let cents = null;
       let inTune = false;
 
-      // Confidence check: gate op RMS en YIN zuiverheid
-      const isConfident = (rms >= 0.007 && lastYinDetails.cmndfVal < 0.18);
-      
-      if (isConfident) {
+      // Noise gate: bereken pitch zodra RMS boven achtergrondruis ligt
+      if (rms >= 0.007) {
         rawFreq = yinPitch(buffer, audioContext.sampleRate);
       }
 
-      if (rawFreq !== -1 && rawFreq >= 65 && rawFreq <= 450) {
+      // Valideer toon: binnen bereik en YIN zuiverheidsscore voldoende
+      const isValidPitch = (rawFreq !== -1 && rawFreq >= 75 && rawFreq <= 450 && lastYinDetails.cmndfVal <= 0.22);
+
+      if (isValidPitch) {
         silenceCounter = 0;
         freqHistory.push(rawFreq);
         if (freqHistory.length > FREQ_HISTORY_SIZE) freqHistory.shift();
@@ -1118,11 +1119,14 @@
         }
       } else {
         silenceCounter++;
-        freqHistory = [];
-        smoothedFreq = 0;
-        smoothNeedleAngle = smoothNeedleAngle * 0.85;
+        // Vloeiende naald-demping richting midden zodra signaal uitdooft
+        smoothNeedleAngle = smoothNeedleAngle * 0.88;
         needle.style.transform = 'rotate(' + smoothNeedleAngle.toFixed(1) + 'deg)';
-        if (silenceCounter > 10) {
+
+        // Pas na 20 frames stilte/onzekerheid (~300ms) de buffers resetten
+        if (silenceCounter > 20) {
+          freqHistory = [];
+          smoothedFreq = 0;
           if (currentLockedString && !isManualLock) {
             currentLockedString = null;
             clearHeadstockVisual();
