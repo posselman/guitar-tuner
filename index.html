@@ -389,7 +389,7 @@
   <div class="app-container">
     <header>
       <h1>🎸 Gitaar Stemmer</h1>
-      <p class="subtitle">Automatische snaardetectie & realtime microfooninput <span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:6px; background:rgba(59,130,246,0.18); border:1px solid rgba(59,130,246,0.35); color:#93c5fd; font-size:10px; font-weight:700; vertical-align:middle;">Build 20260905.2</span></p>
+      <p class="subtitle">Automatische snaardetectie & realtime microfooninput <span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:6px; background:rgba(59,130,246,0.18); border:1px solid rgba(59,130,246,0.35); color:#93c5fd; font-size:10px; font-weight:700; vertical-align:middle;">Build 20260905.3</span></p>
     </header>
 
     <!-- Headstock Visual -->
@@ -612,7 +612,7 @@
     </details>
 
     <footer style="margin-top:14px; font-size:11px; color:var(--text-dim); opacity:0.75;">
-      Versie 1.3.0 • Build 20260905.2 (Debug & Stability Diagnostics)
+      Versie 1.3.0 • Build 20260905.3 (Debug & Stability Diagnostics)
     </footer>
 
     <div id="errorBox"></div>
@@ -885,6 +885,7 @@
         if (bestVal < 0.22) {
           chosenTau = bestTau;
         } else {
+          lastYinDetails = { cmndfVal: bestVal, tau: 0 };
           return -1;
         }
       }
@@ -901,7 +902,8 @@
         }
       }
 
-      lastYinDetails = { cmndfVal: chosenVal, tau: betterTau };
+      const cmndfScore = (chosenTau >= 0 && chosenTau < halfSize) ? cmndf[chosenTau] : 1.0;
+      lastYinDetails = { cmndfVal: cmndfScore, tau: betterTau };
       return sampleRate / betterTau;
     }
 
