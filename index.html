@@ -389,7 +389,7 @@
   <div class="app-container">
     <header>
       <h1>🎸 Gitaar Stemmer</h1>
-      <p class="subtitle">Automatische snaardetectie & realtime microfooninput <span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:6px; background:rgba(59,130,246,0.18); border:1px solid rgba(59,130,246,0.35); color:#93c5fd; font-size:10px; font-weight:700; vertical-align:middle;">Build 20260904.1</span></p>
+      <p class="subtitle">Automatische snaardetectie & realtime microfooninput <span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:6px; background:rgba(59,130,246,0.18); border:1px solid rgba(59,130,246,0.35); color:#93c5fd; font-size:10px; font-weight:700; vertical-align:middle;">Build 20260905.1</span></p>
     </header>
 
     <!-- Headstock Visual -->
@@ -552,8 +552,67 @@
       ℹ️ <strong>Je zit in de Discord-browser.</strong><br>Tik rechtsboven op de drie puntjes <strong>(⋮)</strong> en kies <em>"Openen in Chrome"</em> om hem als echte app te installeren.
     </div>
 
+    <!-- Debug & Stabiliteit Logger -->
+    <details id="debugDetails" style="margin-top: 14px; background: var(--card-inner); border-radius: 16px; padding: 10px 12px; border: 1px solid rgba(255,255,255,0.08); text-align: left;">
+      <summary style="cursor: pointer; font-size: 12px; font-weight: 800; color: #93c5fd; display: flex; align-items: center; justify-content: space-between; list-style: none;">
+        <span style="display: flex; align-items: center; gap: 6px;">
+          🛠️ Debug & Stabiliteit Logger
+        </span>
+        <span id="debugStatusBadge" style="font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 8px; background: rgba(255,255,255,0.08); color: var(--text-dim);">
+          Gereed
+        </span>
+      </summary>
+
+      <div style="margin-top: 10px;">
+        <p style="font-size: 11px; color: var(--text-dim); margin-bottom: 10px; line-height: 1.35;">
+          Neem een snaaraanslag op om frequentieschommelingen, jitter, harmonischen en YIN-zuiverheid te registreren.
+        </p>
+
+        <!-- Knoppen -->
+        <div style="display: flex; gap: 6px; margin-bottom: 10px;">
+          <button id="btnDebug5s" type="button" style="flex: 1.2; padding: 9px 8px; font-size: 11px; font-weight: 700; border-radius: 10px; border: 1px solid rgba(59,130,246,0.5); background: rgba(59,130,246,0.2); color: #93c5fd; cursor: pointer;">
+            ⏱️ Test 5s Snaar
+          </button>
+          <button id="btnDebugToggle" type="button" style="flex: 1; padding: 9px 8px; font-size: 11px; font-weight: 700; border-radius: 10px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); color: #e2e8f0; cursor: pointer;">
+            ⏺️ Start Opname
+          </button>
+        </div>
+
+        <!-- Live Metrics / Samenvatting Box -->
+        <div id="debugMetricsBox" style="display: none; background: #0f141d; border-radius: 10px; padding: 10px; margin-bottom: 10px; font-size: 11px; border: 1px solid rgba(255,255,255,0.06);">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px;">
+            <div>Frames: <strong id="debugFramesCount" style="color:#60a5fa;">0</strong></div>
+            <div>Dominante snaar: <strong id="debugDominantString" style="color:#34d399;">--</strong></div>
+            <div>Grondtoon (Raw): <strong id="debugRawHz" style="color:#f1f5f9;">--</strong></div>
+            <div>Jitter (StDev): <strong id="debugJitter" style="color:#fbbf24;">--</strong></div>
+            <div>Cents afwijking: <strong id="debugCentsAvg" style="color:#f1f5f9;">--</strong></div>
+            <div>YIN zuiverheid: <strong id="debugYinScore" style="color:#a78bfa;">--</strong></div>
+          </div>
+          <div id="debugOctaveWarning" style="display:none; color: #f87171; font-size: 10px; margin-top: 4px; padding: 4px 6px; background: rgba(239,68,68,0.12); border-radius: 6px;">
+            ⚠️ 2e Harmonische (octaafsprong) in <span id="debugOctavePct">0%</span> van frames!
+          </div>
+        </div>
+
+        <!-- Export knoppen -->
+        <div id="debugExportRow" style="display: none; gap: 6px; margin-bottom: 6px;">
+          <button id="btnCopyDebug" type="button" style="flex: 2; padding: 8px; font-size: 11px; font-weight: 700; border-radius: 8px; border: 1px solid rgba(16,185,129,0.5); background: rgba(16,185,129,0.2); color: #34d399; cursor: pointer;">
+            📋 Kopieer voor Discord
+          </button>
+          <button id="btnDownloadCsv" type="button" style="flex: 1; padding: 8px; font-size: 11px; font-weight: 600; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); color: #cbd5e1; cursor: pointer;">
+            💾 CSV
+          </button>
+          <button id="btnClearDebug" type="button" style="flex: 0.6; padding: 8px; font-size: 11px; font-weight: 600; border-radius: 8px; border: 1px solid rgba(239,68,68,0.3); background: rgba(239,68,68,0.1); color: #f87171; cursor: pointer;">
+            🗑️
+          </button>
+        </div>
+        <div id="copyNotice" style="display:none; font-size: 11px; color: #34d399; text-align: center; margin-top: 4px; font-weight: 700;">
+          ✓ Gekopieerd naar klembord! Plak het direct in Discord.
+        </div>
+      </div>
+    </details>
+
     <footer style="margin-top:14px; font-size:11px; color:var(--text-dim); opacity:0.75;">
-      Versie 1.2.0 • Build 20260904.1 (YIN + DSP Filter)
+      Versie 1.3.0 • Build 20260905.1 (Debug & Stability Diagnostics)
     </footer>
 
     <div id="errorBox"></div>
@@ -612,6 +671,33 @@
     const gainSlider = document.getElementById('gainSlider');
     const gainVal = document.getElementById('gainVal');
     const pegGroups = document.querySelectorAll('.peg-group');
+
+    // Debug & Logging elementen en state
+    let lastYinDetails = { cmndfVal: 1.0, tau: 0 };
+    let debugRecording = false;
+    let debugRecordStartTime = 0;
+    let debugTimerInterval = null;
+    let debugCountdown = 0;
+    let debugLogs = [];
+
+    const debugDetails = document.getElementById('debugDetails');
+    const debugStatusBadge = document.getElementById('debugStatusBadge');
+    const btnDebug5s = document.getElementById('btnDebug5s');
+    const btnDebugToggle = document.getElementById('btnDebugToggle');
+    const debugMetricsBox = document.getElementById('debugMetricsBox');
+    const debugFramesCount = document.getElementById('debugFramesCount');
+    const debugDominantString = document.getElementById('debugDominantString');
+    const debugRawHz = document.getElementById('debugRawHz');
+    const debugJitter = document.getElementById('debugJitter');
+    const debugCentsAvg = document.getElementById('debugCentsAvg');
+    const debugYinScore = document.getElementById('debugYinScore');
+    const debugOctaveWarning = document.getElementById('debugOctaveWarning');
+    const debugOctavePct = document.getElementById('debugOctavePct');
+    const debugExportRow = document.getElementById('debugExportRow');
+    const btnCopyDebug = document.getElementById('btnCopyDebug');
+    const btnDownloadCsv = document.getElementById('btnDownloadCsv');
+    const btnClearDebug = document.getElementById('btnClearDebug');
+    const copyNotice = document.getElementById('copyNotice');
 
     if (gainSlider) {
       gainSlider.addEventListener('input', (e) => {
@@ -815,6 +901,7 @@
         }
       }
 
+      lastYinDetails = { cmndfVal: chosenVal, tau: betterTau };
       return sampleRate / betterTau;
     }
 
@@ -890,7 +977,7 @@
           if (freqHistory.length > FREQ_HISTORY_SIZE) {
             freqHistory.shift();
           }
-          const medianFreq = calculateMedian(freqHistory);
+          medianFreq = calculateMedian(freqHistory);
 
           // Vloeiende frequentie-interpolatie (Smoothing)
           if (smoothedFreq === 0) {
@@ -899,7 +986,7 @@
             smoothedFreq = smoothedFreq * 0.70 + medianFreq * 0.30;
           }
 
-          const match = detectNearestGuitarString(smoothedFreq);
+          match = detectNearestGuitarString(smoothedFreq);
 
           if (match) {
             const detectedString = match.string;
@@ -931,8 +1018,8 @@
               ? activeString.freq * 2
               : activeString.freq;
 
-            const cents = Math.round(1200 * Math.log2(smoothedFreq / targetFreqVal));
-            const inTune = Math.abs(cents) <= 4;
+            cents = Math.round(1200 * Math.log2(smoothedFreq / targetFreqVal));
+            inTune = Math.abs(cents) <= 4;
 
             stringTitle.textContent = activeString.label.toUpperCase();
             noteDisplay.textContent = activeString.id;
@@ -980,6 +1067,25 @@
             statusBadge.className = 'status-badge';
           }
         }
+      }
+
+      // Live Debug Recording
+      if (debugRecording) {
+        const t = Math.round(performance.now() - debugRecordStartTime);
+        const hasPitch = (rawFreq !== -1 && rawFreq >= 65 && rawFreq <= 450);
+        debugLogs.push({
+          t: t,
+          rms: parseFloat(rms.toFixed(4)),
+          rawFreq: hasPitch ? parseFloat(rawFreq.toFixed(2)) : null,
+          medianFreq: hasPitch ? parseFloat(medianFreq.toFixed(2)) : null,
+          smoothedFreq: hasPitch ? parseFloat(smoothedFreq.toFixed(2)) : null,
+          stringId: currentLockedString ? currentLockedString.id : (match ? match.string.id : null),
+          targetFreq: currentLockedString ? currentLockedString.freq : (match ? match.string.freq : null),
+          cents: (cents !== null && isFinite(cents)) ? cents : null,
+          isOctave: match ? match.isOctave : false,
+          yinVal: parseFloat(lastYinDetails.cmndfVal.toFixed(3))
+        });
+        updateDebugLiveHUD();
       }
 
       animationId = requestAnimationFrame(updatePitch);
@@ -1035,7 +1141,325 @@
       }
     });
 
-    if ('serviceWorker' in navigator) {
+
+    // ==========================================
+    // DEBUG & DIAGNOSTIEK LOGGING
+    // ==========================================
+    function updateDebugLiveHUD() {
+      if (!debugLogs || debugLogs.length === 0) return;
+      debugFramesCount.textContent = debugLogs.length;
+      const last = debugLogs[debugLogs.length - 1];
+      if (last.rawFreq) {
+        debugRawHz.textContent = last.rawFreq.toFixed(1) + ' Hz';
+      }
+      if (last.stringId) {
+        debugDominantString.textContent = last.stringId;
+      }
+      if (last.cents !== null) {
+        debugCentsAvg.textContent = (last.cents > 0 ? '+' : '') + last.cents + ' ct';
+      }
+      if (last.yinVal !== null) {
+        debugYinScore.textContent = last.yinVal.toFixed(3);
+      }
+    }
+
+    async function startDebugRecording(autoStopSeconds = null) {
+      if (!isRunning) {
+        await startTuner();
+      }
+      if (!isRunning) return;
+
+      debugDetails.open = true;
+      debugLogs = [];
+      debugRecording = true;
+      debugRecordStartTime = performance.now();
+      debugMetricsBox.style.display = 'block';
+      debugExportRow.style.display = 'none';
+      copyNotice.style.display = 'none';
+      debugOctaveWarning.style.display = 'none';
+      debugFramesCount.textContent = '0';
+      debugDominantString.textContent = '--';
+      debugRawHz.textContent = '--';
+      debugJitter.textContent = '--';
+      debugCentsAvg.textContent = '--';
+      debugYinScore.textContent = '--';
+
+      btnDebugToggle.textContent = '⏹️ Stop Opname';
+      btnDebugToggle.style.background = 'rgba(239,68,68,0.2)';
+      btnDebugToggle.style.borderColor = 'rgba(239,68,68,0.5)';
+      btnDebugToggle.style.color = '#f87171';
+
+      if (autoStopSeconds) {
+        debugCountdown = autoStopSeconds;
+        btnDebug5s.textContent = '⏳ ' + debugCountdown + 's...';
+        btnDebug5s.disabled = true;
+        debugStatusBadge.textContent = 'Opnemen (' + debugCountdown + 's)';
+        debugStatusBadge.style.color = '#60a5fa';
+
+        if (debugTimerInterval) clearInterval(debugTimerInterval);
+        debugTimerInterval = setInterval(() => {
+          debugCountdown--;
+          if (debugCountdown > 0) {
+            btnDebug5s.textContent = '⏳ ' + debugCountdown + 's...';
+            debugStatusBadge.textContent = 'Opnemen (' + debugCountdown + 's)';
+          } else {
+            clearInterval(debugTimerInterval);
+            debugTimerInterval = null;
+            stopDebugRecording();
+          }
+        }, 1000);
+      } else {
+        debugStatusBadge.textContent = 'Opname actief...';
+        debugStatusBadge.style.color = '#ef4444';
+      }
+    }
+
+    function stopDebugRecording() {
+      if (!debugRecording) return;
+      debugRecording = false;
+      if (debugTimerInterval) {
+        clearInterval(debugTimerInterval);
+        debugTimerInterval = null;
+      }
+
+      btnDebug5s.textContent = '⏱️ Test 5s Snaar';
+      btnDebug5s.disabled = false;
+      btnDebugToggle.textContent = '⏺️ Start Opname';
+      btnDebugToggle.style.background = 'rgba(255,255,255,0.06)';
+      btnDebugToggle.style.borderColor = 'rgba(255,255,255,0.15)';
+      btnDebugToggle.style.color = '#e2e8f0';
+
+      debugStatusBadge.textContent = debugLogs.length + ' frames gereed';
+      debugStatusBadge.style.color = '#34d399';
+
+      renderDebugAnalysis();
+    }
+
+    function analyzeDebugLogs(logs) {
+      if (!logs || logs.length === 0) return null;
+      const duration = (logs[logs.length - 1].t / 1000).toFixed(1);
+      const valid = logs.filter(l => l.rawFreq && l.rawFreq > 0);
+
+      if (valid.length === 0) {
+        return {
+          totalFrames: logs.length,
+          validFrames: 0,
+          duration: duration,
+          sampleRate: audioContext ? audioContext.sampleRate : 48000,
+          dominantString: 'Geen',
+          meanRaw: '0.00',
+          stdevRaw: '0.00',
+          meanSmooth: '0.00',
+          stdevSmooth: '0.00',
+          meanJitter: '0.00',
+          meanCents: '0',
+          minCents: 0,
+          maxCents: 0,
+          octavePct: 0,
+          meanYin: '1.000',
+          firstSamples: []
+        };
+      }
+
+      // Dominante snaar bepalen
+      const counts = {};
+      valid.forEach(l => {
+        if (l.stringId) counts[l.stringId] = (counts[l.stringId] || 0) + 1;
+      });
+      let dominantString = 'Onbekend';
+      let maxC = 0;
+      for (const k in counts) {
+        if (counts[k] > maxC) {
+          maxC = counts[k];
+          dominantString = k;
+        }
+      }
+
+      // Grondtoon (Raw YIN)
+      const rawVals = valid.map(l => l.rawFreq);
+      const meanRaw = rawVals.reduce((a, b) => a + b, 0) / rawVals.length;
+      const varRaw = rawVals.reduce((a, b) => a + Math.pow(b - meanRaw, 2), 0) / rawVals.length;
+      const stdevRaw = Math.sqrt(varRaw);
+
+      // Frame-to-frame jitter
+      let jumps = [];
+      for (let i = 1; i < rawVals.length; i++) {
+        jumps.push(Math.abs(rawVals[i] - rawVals[i - 1]));
+      }
+      const meanJitter = jumps.length ? (jumps.reduce((a, b) => a + b, 0) / jumps.length) : 0;
+
+      // Smoothed freq
+      const smoothVals = valid.map(l => l.smoothedFreq || l.rawFreq);
+      const meanSmooth = smoothVals.reduce((a, b) => a + b, 0) / smoothVals.length;
+      const varSmooth = smoothVals.reduce((a, b) => a + Math.pow(b - meanSmooth, 2), 0) / smoothVals.length;
+      const stdevSmooth = Math.sqrt(varSmooth);
+
+      // Cents afwijking
+      const centsVals = valid.filter(l => l.cents !== null).map(l => l.cents);
+      const meanCents = centsVals.length ? Math.round(centsVals.reduce((a, b) => a + b, 0) / centsVals.length) : 0;
+      const minCents = centsVals.length ? Math.min(...centsVals) : 0;
+      const maxCents = centsVals.length ? Math.max(...centsVals) : 0;
+
+      // 2e Harmonische detectiepercentage
+      const octFrames = valid.filter(l => l.isOctave).length;
+      const octavePct = Math.round((octFrames / valid.length) * 100);
+
+      // YIN kwaliteit
+      const yinVals = valid.filter(l => l.yinVal !== null).map(l => l.yinVal);
+      const meanYin = yinVals.length ? (yinVals.reduce((a, b) => a + b, 0) / yinVals.length) : 1;
+
+      return {
+        totalFrames: logs.length,
+        validFrames: valid.length,
+        duration: duration,
+        sampleRate: audioContext ? audioContext.sampleRate : 48000,
+        dominantString: dominantString,
+        meanRaw: meanRaw.toFixed(2),
+        stdevRaw: stdevRaw.toFixed(2),
+        meanSmooth: meanSmooth.toFixed(2),
+        stdevSmooth: stdevSmooth.toFixed(2),
+        meanJitter: meanJitter.toFixed(2),
+        meanCents: (meanCents > 0 ? '+' : '') + meanCents,
+        minCents: minCents,
+        maxCents: maxCents,
+        octavePct: octavePct,
+        meanYin: meanYin.toFixed(3),
+        firstSamples: valid.slice(0, 6).map(l => l.rawFreq.toFixed(1) + 'Hz')
+      };
+    }
+
+    function renderDebugAnalysis() {
+      const stats = analyzeDebugLogs(debugLogs);
+      if (!stats) return;
+
+      debugMetricsBox.style.display = 'block';
+      debugExportRow.style.display = 'flex';
+
+      debugFramesCount.textContent = stats.validFrames + ' / ' + stats.totalFrames;
+      debugDominantString.textContent = stats.dominantString;
+      debugRawHz.textContent = stats.validFrames > 0 ? stats.meanRaw + ' Hz' : '--';
+      debugJitter.textContent = stats.validFrames > 0 ? '±' + stats.stdevRaw + ' Hz' : '--';
+      debugCentsAvg.textContent = stats.validFrames > 0 ? stats.meanCents + ' ct' : '--';
+      debugYinScore.textContent = stats.validFrames > 0 ? stats.meanYin : '--';
+
+      if (stats.octavePct > 15) {
+        debugOctaveWarning.style.display = 'block';
+        debugOctavePct.textContent = stats.octavePct + '%';
+      } else {
+        debugOctaveWarning.style.display = 'none';
+      }
+    }
+
+    function formatDiscordReport(stats) {
+      if (!stats || stats.validFrames === 0) {
+        return '🎸 **Gitaarstemmer Test:** Geen stabiele toon gedetecteerd (RMS te laag of alleen stilte).';
+      }
+      return [
+        '**🎸 Gitaarstemmer Debug Rapport**',
+        '• **Snaar:** ' + stats.dominantString + ' | **Duur:** ' + stats.duration + 's (' + stats.validFrames + '/' + stats.totalFrames + ' frames actief)',
+        '• **AudioContext:** ' + stats.sampleRate + ' Hz | **Gain:** ' + currentGain + 'x',
+        '• **Ruwe YIN Grondtoon:** Gemiddeld **' + stats.meanRaw + ' Hz** (StDev: ±' + stats.stdevRaw + ' Hz, Frame-Jitter: ' + stats.meanJitter + ' Hz)',
+        '• **Na DSP Smoothing:** Gemiddeld **' + stats.meanSmooth + ' Hz** (StDev: ±' + stats.stdevSmooth + ' Hz)',
+        '• **Afwijking Cents:** Gemiddeld **' + stats.meanCents + ' cents** (Bereik: ' + stats.minCents + ' tot ' + stats.maxCents + ' ct)',
+        '• **2e Harmonische / Octaafmatch:** ' + stats.octavePct + '%',
+        '• **YIN Zuiverheidsscore:** ' + stats.meanYin + ' (lager = zuiverdere periodieke golf)',
+        '• **Voorbeeld metingen:** [' + stats.firstSamples.join(', ') + ']'
+      ].join('\n');
+    }
+
+    function generateCSV(logs) {
+      const headers = ['t_ms', 'rms', 'raw_freq_hz', 'median_freq_hz', 'smoothed_freq_hz', 'string_id', 'target_freq_hz', 'cents', 'is_octave', 'yin_cmndf'];
+      const lines = logs.map(l => [
+        l.t,
+        l.rms,
+        l.rawFreq !== null ? l.rawFreq : '',
+        l.medianFreq !== null ? l.medianFreq : '',
+        l.smoothedFreq !== null ? l.smoothedFreq : '',
+        l.stringId || '',
+        l.targetFreq !== null ? l.targetFreq : '',
+        l.cents !== null ? l.cents : '',
+        l.isOctave ? '1' : '0',
+        l.yinVal !== null ? l.yinVal : ''
+      ].join(','));
+      return [headers.join(','), ...lines].join('\n');
+    }
+
+    async function copyToClipboard(text) {
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+          return true;
+        }
+      } catch (e) {
+        console.warn('Clipboard writeText failed', e);
+      }
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const res = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return res;
+    }
+
+    if (btnDebug5s) {
+      btnDebug5s.addEventListener('click', () => {
+        startDebugRecording(5);
+      });
+    }
+
+    if (btnDebugToggle) {
+      btnDebugToggle.addEventListener('click', () => {
+        if (debugRecording) {
+          stopDebugRecording();
+        } else {
+          startDebugRecording();
+        }
+      });
+    }
+
+    if (btnCopyDebug) {
+      btnCopyDebug.addEventListener('click', async () => {
+        const stats = analyzeDebugLogs(debugLogs);
+        if (!stats) return;
+        const report = formatDiscordReport(stats);
+        const ok = await copyToClipboard(report);
+        if (ok) {
+          copyNotice.style.display = 'block';
+          setTimeout(() => { copyNotice.style.display = 'none'; }, 4000);
+        }
+      });
+    }
+
+    if (btnDownloadCsv) {
+      btnDownloadCsv.addEventListener('click', () => {
+        if (!debugLogs || debugLogs.length === 0) return;
+        const csv = generateCSV(debugLogs);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'guitar-tuner-debug-' + Date.now() + '.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
+    }
+
+    if (btnClearDebug) {
+      btnClearDebug.addEventListener('click', () => {
+        debugLogs = [];
+        debugMetricsBox.style.display = 'none';
+        debugExportRow.style.display = 'none';
+        debugStatusBadge.textContent = 'Gewist';
+        debugStatusBadge.style.color = 'var(--text-dim)';
+      });
+    }
+
+        if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js').catch(err => console.log('SW error:', err));
     }
   </script>
