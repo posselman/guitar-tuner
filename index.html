@@ -422,7 +422,7 @@
   <div class="app-container">
     <header>
       <h1>🎸 Gitaar Stemmer</h1>
-      <p class="subtitle">Automatische snaardetectie & realtime microfooninput <span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:6px; background:rgba(59,130,246,0.18); border:1px solid rgba(59,130,246,0.35); color:#93c5fd; font-size:10px; font-weight:700; vertical-align:middle;">Build 20260905.9</span></p>
+      <p class="subtitle">Automatische snaardetectie & realtime microfooninput <span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:6px; background:rgba(59,130,246,0.18); border:1px solid rgba(59,130,246,0.35); color:#93c5fd; font-size:10px; font-weight:700; vertical-align:middle;">Build 20260905.10</span></p>
     </header>
 
     <!-- Instrumentkeuze: Akoestisch vs Elektrisch -->
@@ -652,7 +652,7 @@
     </details>
 
     <footer style="margin-top:14px; font-size:11px; color:var(--text-dim); opacity:0.75;">
-      Versie 1.4.0 • Build 20260905.9 (Akoestisch / Elektrisch profielen)
+      Versie 1.4.1 • Build 20260905.10 (Elektrisch: B3/E4 stabiliteitsfix)
     </footer>
 
     <div id="errorBox"></div>
@@ -701,7 +701,9 @@
         maxFreq: 450,
         yinThreshold: 0.13, // elektrisch = zuiverder periodiek signaal, strenger
         defaultGain: 12,    // onversterkt is een elektrische snaar stiller
-        noiseGate: 0.006
+        noiseGate: 0.006,
+        maxCmndfVal: 0.10, // elektrisch: alleen zuivere frames toelaten (vuile decay-staart eruit)
+        confirmE2Third: true // B3 (246.9 Hz) = óók E2's 3e harmonische: niet delen zonder 164.8 Hz-bevestiging
       }
     };
 
@@ -1024,7 +1026,8 @@
             bestTau = tau;
           }
         }
-        if (bestVal < 0.22) {
+        const fallbackMaxCmndf = (activeProfile.maxCmndfVal != null) ? activeProfile.maxCmndfVal : 0.22;
+        if (bestVal < fallbackMaxCmndf) {
           chosenTau = bestTau;
         } else {
           lastYinDetails = { cmndfVal: bestVal, tau: 0 };
@@ -1041,10 +1044,25 @@
 
       if (isE2HarmonicBand && cmndf[chosenTau] > 0.02) {
         const checkK = (candFreq >= 238) ? [3] : [2];
+        const profE2Confirm = (activeProfile.confirmE2Third === true);
         for (const k of checkK) {
           const subTau = Math.round(chosenTau * k);
           const subFreq = sampleRate / subTau;
           if (subFreq >= profMin && subTau < maxTau) {
+            // Elektrisch-profiel: B3 (246.9 Hz) is óók de 3e harmonische van E2.
+            // Alleen delen naar E2 als de toon daadwerkelijk energie rond de 2e
+            // harmonische van E2 (~164.8 Hz) bevat; een echte B3 heeft die niet.
+            if (profE2Confirm && k === 3) {
+              const confTau = Math.round(chosenTau * 1.5);
+              const confMin = Math.max(minTau, confTau - 12);
+              const confMax = Math.min(maxTau, confTau + 12);
+              let confLocalMin = confMin;
+              for (let t = confMin; t <= confMax; t++) {
+                if (cmndf[t] < cmndf[confLocalMin]) confLocalMin = t;
+              }
+              // Geen bevestigingsdip onder de drempel => echte B3, niet delen
+              if (!(cmndf[confLocalMin] < threshold)) continue;
+            }
             const wMin = Math.max(minTau, subTau - 10);
             const wMax = Math.min(maxTau, subTau + 10);
             let localMinTau = wMin;
@@ -1150,8 +1168,9 @@
         rawFreq = yinPitch(buffer, audioContext.sampleRate);
       }
 
-      // Valideer toon: binnen bereik en YIN zuiverheidsscore voldoende
-      const isValidPitch = (rawFreq !== -1 && rawFreq >= activeProfile.minFreq && rawFreq <= activeProfile.maxFreq && lastYinDetails.cmndfVal <= 0.22);
+      // Valideer toon: binnen bereik en YIN zuiverheidsscore voldoende (grens per instrumentprofiel)
+      const maxCmndfVal = (activeProfile.maxCmndfVal != null) ? activeProfile.maxCmndfVal : 0.22;
+      const isValidPitch = (rawFreq !== -1 && rawFreq >= activeProfile.minFreq && rawFreq <= activeProfile.maxFreq && lastYinDetails.cmndfVal <= maxCmndfVal);
 
       if (isValidPitch) {
         silenceCounter = 0;

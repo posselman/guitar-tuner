@@ -1,4 +1,4 @@
-const CACHE_NAME = 'guitar-tuner-v13-build-20260905.9';
+const CACHE_NAME = 'guitar-tuner-v14-build-20260905.10';
 const ASSETS = [
   './',
   './index.html',
