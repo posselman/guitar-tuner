@@ -389,7 +389,7 @@
   <div class="app-container">
     <header>
       <h1>🎸 Gitaar Stemmer</h1>
-      <p class="subtitle">Automatische snaardetectie & realtime microfooninput <span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:6px; background:rgba(59,130,246,0.18); border:1px solid rgba(59,130,246,0.35); color:#93c5fd; font-size:10px; font-weight:700; vertical-align:middle;">Build 20260905.7</span></p>
+      <p class="subtitle">Automatische snaardetectie & realtime microfooninput <span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:6px; background:rgba(59,130,246,0.18); border:1px solid rgba(59,130,246,0.35); color:#93c5fd; font-size:10px; font-weight:700; vertical-align:middle;">Build 20260905.8</span></p>
     </header>
 
     <!-- Headstock Visual -->
@@ -612,7 +612,7 @@
     </details>
 
     <footer style="margin-top:14px; font-size:11px; color:var(--text-dim); opacity:0.75;">
-      Versie 1.3.0 • Build 20260905.7 (Debug & Stability Diagnostics)
+      Versie 1.3.0 • Build 20260905.8 (Debug & Stability Diagnostics)
     </footer>
 
     <div id="errorBox"></div>
@@ -903,17 +903,16 @@
         }
       }
 
-      // Stap 3b: Gitaar Harmonischen Resolutie (3e en 2e boventoon check)
-      // Alleen voor kandidaatfrequenties die overtonen van E2 of A2 kunnen zijn.
-      // D3 (147 Hz) en G3 (196 Hz) zijn hun eigen grondtoon en mogen nooit naar subharmonischen duiken.
+      // Stap 3b: Gitaar Harmonischen Resolutie
+      // Alleen actief voor overtonen van Lage E (82 Hz): de 2e (165 Hz) of 3e (247 Hz).
+      // Hoge E (E4, 330 Hz), B3 (247 Hz), G3, D3 en A2 hebben luide grondtonen en mogen NOOIT gedeeld worden.
       const candFreq = sampleRate / chosenTau;
-      const isHarmonicBand = (candFreq >= 155 && candFreq <= 178) || // E2 2nd harm (164.8 Hz)
-                             (candFreq >= 210 && candFreq <= 235) || // A2 2nd harm (220.0 Hz)
-                             (candFreq >= 235 && candFreq <= 265) || // E2 3rd harm (247.2 Hz)
-                             (candFreq >= 315 && candFreq <= 345);   // A2 3rd harm (330.0 Hz)
+      const isE2HarmonicBand = (candFreq >= 155 && candFreq <= 178) || // E2 2e harmonische
+                               (candFreq >= 238 && candFreq <= 260);   // E2 3e harmonische
 
-      if (isHarmonicBand && cmndf[chosenTau] > 0.02) {
-        for (const k of [3, 2]) {
+      if (isE2HarmonicBand && cmndf[chosenTau] > 0.02) {
+        const checkK = (candFreq >= 238) ? [3] : [2];
+        for (const k of checkK) {
           const subTau = Math.round(chosenTau * k);
           const subFreq = sampleRate / subTau;
           if (subFreq >= 75 && subTau < maxTau) {
@@ -925,8 +924,8 @@
                 localMinTau = t;
               }
             }
-            // Als de lagere grondtoon een overtuigende dip heeft (constructieve interferentie)
-            if (cmndf[localMinTau] < cmndf[chosenTau] - 0.05 || (cmndf[localMinTau] < threshold && cmndf[localMinTau] < cmndf[chosenTau] * 0.7)) {
+            // Alleen als de 82 Hz grondtoon echt fysiek aanwezig en overtuigend diep is
+            if (cmndf[localMinTau] < cmndf[chosenTau] - 0.04 || (cmndf[localMinTau] < threshold && cmndf[localMinTau] < cmndf[chosenTau] * 0.7)) {
               chosenTau = localMinTau;
               break;
             }
