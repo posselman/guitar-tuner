@@ -422,7 +422,7 @@
   <div class="app-container">
     <header>
       <h1>🎸 Gitaar Stemmer</h1>
-      <p class="subtitle">Automatische snaardetectie & realtime microfooninput <span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:6px; background:rgba(59,130,246,0.18); border:1px solid rgba(59,130,246,0.35); color:#93c5fd; font-size:10px; font-weight:700; vertical-align:middle;">Build 20260905.11</span></p>
+      <p class="subtitle">Automatische snaardetectie & realtime microfooninput <span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:6px; background:rgba(59,130,246,0.18); border:1px solid rgba(59,130,246,0.35); color:#93c5fd; font-size:10px; font-weight:700; vertical-align:middle;">Build 20260905.12</span></p>
     </header>
 
     <!-- Instrumentkeuze: Akoestisch vs Elektrisch -->
@@ -652,7 +652,7 @@
     </details>
 
     <footer style="margin-top:14px; font-size:11px; color:var(--text-dim); opacity:0.75;">
-      Versie 1.4.2 • Build 20260905.11 (Adaptieve ruisdrempel, hysteresis, scherpere zuiverheid)
+      Versie 1.4.3 • Build 20260905.12 (Revert adaptieve gate — elektrisch hersteld)
     </footer>
 
     <div id="errorBox"></div>
@@ -730,7 +730,6 @@
     let isManualLock = false;
     let silenceCounter = 0;
     let smoothedFreq = 0;
-    let noiseFloor = 0; // adaptieve omgevingsvloer (RMS), volgt stille frames
     let biquadHighpass = null;
     let biquadLowpass = null;
     let freqHistory = [];
@@ -830,7 +829,6 @@
           // Buffers legen bij omschakelen: oude meetgeschiedenis hoort niet bij de nieuwe modus
           freqHistory = [];
           smoothedFreq = 0;
-          noiseFloor = 0; // vloer herijken: gain/filters wijzigen met de modus
           pendingCandidateString = null;
           pendingCandidateCount = 0;
         }
@@ -955,7 +953,6 @@
       gainNode = null;
       freqHistory = [];
       smoothedFreq = 0;
-      noiseFloor = 0; // vloer herijken bij elke start
       smoothNeedleAngle = 0;
       pendingCandidateString = null;
       pendingCandidateCount = 0;
@@ -1167,14 +1164,10 @@
       let cents = null;
       let inTune = false;
 
-      // Adaptieve noise gate: drempel = absoluut minimum óf 3x de geschatte
-      // omgevingsvloer (wat hoger is). Zo blijft de gate betekenisvol bij élke gain
-      // (omgevingsruis wordt immers mee versterkt) en schaalt hij mee met de ruimte.
-      const gateAbs = activeProfile.noiseGate;
-      const gateAdapt = noiseFloor * 3.0;
-      const noiseGateActive = Math.max(gateAbs, gateAdapt);
-
-      if (rms >= noiseGateActive) {
+      // Noise gate: absolute drempel per instrumentprofiel. (Build .11 probeerde een
+      // adaptieve '3x omgevingsvloer'-drempel, maar onversterkt-elektrisch heeft te weinig
+      // signaal-ruisruimte -> gate sloot alles. Ruiswerping gebeurt via maxCmndfVal + hysteresis.)
+      if (rms >= activeProfile.noiseGate) {
         rawFreq = yinPitch(buffer, audioContext.sampleRate);
       }
 
@@ -1276,12 +1269,6 @@
         }
       } else {
         silenceCounter++;
-        // Omgevingsvloer bijwerken in stille frames (geen geldige toon èn onder de actieve drempel):
-        // direct omlaag bij stiller worden, langzaam omhoog als de ruimte luider wordt.
-        if (rms < noiseGateActive) {
-          if (rms < noiseFloor) noiseFloor = rms;
-          else noiseFloor += (rms - noiseFloor) * 0.004;
-        }
         // Vloeiende naald-demping richting midden zodra signaal uitdooft
         smoothNeedleAngle = smoothNeedleAngle * 0.88;
         needle.style.transform = 'rotate(' + smoothNeedleAngle.toFixed(1) + 'deg)';
