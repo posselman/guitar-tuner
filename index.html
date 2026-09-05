@@ -383,14 +383,54 @@
       font-size: 12px;
       text-align: left;
     }
+    .instrument-toggle {
+      display: flex;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 5px;
+      margin-bottom: 10px;
+    }
+    .instrument-btn {
+      flex: 1;
+      padding: 10px 6px;
+      font-size: 13px;
+      font-weight: 800;
+      border: none;
+      border-radius: 9px;
+      background: transparent;
+      color: var(--text-dim);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .instrument-btn.active {
+      background: rgba(59, 130, 246, 0.35);
+      color: #ffffff;
+      box-shadow: 0 2px 10px rgba(59, 130, 246, 0.35);
+    }
+    .instrument-hint {
+      font-size: 11px;
+      color: var(--text-dim);
+      text-align: center;
+      margin: -2px 0 14px 0;
+      line-height: 1.45;
+    }
   </style>
 </head>
 <body>
   <div class="app-container">
     <header>
       <h1>🎸 Gitaar Stemmer</h1>
-      <p class="subtitle">Automatische snaardetectie & realtime microfooninput <span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:6px; background:rgba(59,130,246,0.18); border:1px solid rgba(59,130,246,0.35); color:#93c5fd; font-size:10px; font-weight:700; vertical-align:middle;">Build 20260905.8</span></p>
+      <p class="subtitle">Automatische snaardetectie & realtime microfooninput <span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:6px; background:rgba(59,130,246,0.18); border:1px solid rgba(59,130,246,0.35); color:#93c5fd; font-size:10px; font-weight:700; vertical-align:middle;">Build 20260905.9</span></p>
     </header>
+
+    <!-- Instrumentkeuze: Akoestisch vs Elektrisch -->
+    <div class="instrument-toggle" role="group" aria-label="Instrumentmodus">
+      <button type="button" id="modeBtn-acoustic" class="instrument-btn active" data-mode="acoustic">🎸 Akoestisch</button>
+      <button type="button" id="modeBtn-electric" class="instrument-btn" data-mode="electric">⚡ Elektrisch</button>
+    </div>
+    <p class="instrument-hint" id="instrumentHint"></p>
 
     <!-- Headstock Visual -->
     <div class="headstock-card">
@@ -612,7 +652,7 @@
     </details>
 
     <footer style="margin-top:14px; font-size:11px; color:var(--text-dim); opacity:0.75;">
-      Versie 1.3.0 • Build 20260905.8 (Debug & Stability Diagnostics)
+      Versie 1.4.0 • Build 20260905.9 (Akoestisch / Elektrisch profielen)
     </footer>
 
     <div id="errorBox"></div>
@@ -635,6 +675,45 @@
       { id: 'B3', num: 2, note: 'B', octave: 3, freq: 246.94, label: 'Snaar 2: B (B3)' },
       { id: 'E4', num: 1, note: 'E', octave: 4, freq: 329.63, label: 'Snaar 1: Hoge E (E4)' }
     ];
+
+    // Instrumentprofielen: elke modus heeft eigen DSP-instellingen.
+    // Akoestisch = de bewezen defaults uit de akoestische testrondes.
+    // Elektrisch = eerste instelling o.b.v. pickupkarakteristiek; wordt verfijnd
+    // met de elektrische testdata (deze worden in het debug-rapport meegelogd).
+    const INSTRUMENT_PROFILES = {
+      acoustic: {
+        label: 'Akoestisch',
+        emoji: '🎸',
+        highpassHz: 65,   // blokkeer gerommel & 50Hz netbrom
+        lowpassHz: 420,   // snij ruis/sis boven het snaarbereik af
+        minFreq: 75,      // ondergrens zoekbereik (E2 = 82.4 Hz)
+        maxFreq: 450,     // bovengrens zoekbereik (E4 = 329.6 Hz)
+        yinThreshold: 0.15,
+        defaultGain: 8,
+        noiseGate: 0.007
+      },
+      electric: {
+        label: 'Elektrisch',
+        emoji: '⚡',
+        highpassHz: 72,   // iets hoger: sterkere 50Hz-brom van pickups
+        lowpassHz: 420,
+        minFreq: 75,
+        maxFreq: 450,
+        yinThreshold: 0.13, // elektrisch = zuiverder periodiek signaal, strenger
+        defaultGain: 12,    // onversterkt is een elektrische snaar stiller
+        noiseGate: 0.006
+      }
+    };
+
+    let instrumentMode = 'acoustic';
+    let activeProfile = INSTRUMENT_PROFILES.acoustic;
+    try {
+      const savedMode = localStorage.getItem('tunerInstrumentMode');
+      if (savedMode && INSTRUMENT_PROFILES[savedMode]) {
+        instrumentMode = savedMode;
+        activeProfile = INSTRUMENT_PROFILES[savedMode];
+      }
+    } catch (e) {}
 
     let audioContext = null;
     let analyser = null;
@@ -708,6 +787,54 @@
       });
     }
 
+    // Instrumentmodus-schakelaar: past DSP-profiel toe en slaat keuze op
+    const instrumentButtons = document.querySelectorAll('.instrument-btn');
+    const instrumentHint = document.getElementById('instrumentHint');
+
+    function profileSummary(p) {
+      return p.emoji + ' ' + p.label + ' • Highpass ' + p.highpassHz + ' Hz • Lowpass ' +
+        p.lowpassHz + ' Hz • YIN-drempel ' + p.yinThreshold + ' • Gain ' + p.defaultGain + 'x';
+    }
+
+    function applyInstrumentMode(mode) {
+      if (!INSTRUMENT_PROFILES[mode]) return;
+      instrumentMode = mode;
+      activeProfile = INSTRUMENT_PROFILES[mode];
+      try { localStorage.setItem('tunerInstrumentMode', mode); } catch (e) {}
+
+      // Startgain van het profiel (handmatige schuif blijft daarna vrij aanpasbaar)
+      currentGain = activeProfile.defaultGain;
+      if (gainSlider) gainSlider.value = currentGain;
+      if (gainVal) gainVal.textContent = currentGain + 'x';
+      if (gainNode) gainNode.gain.value = currentGain;
+
+      // Live filter-update als de microfoon al draait (geen herstart nodig)
+      if (biquadHighpass) biquadHighpass.frequency.value = activeProfile.highpassHz;
+      if (biquadLowpass) biquadLowpass.frequency.value = activeProfile.lowpassHz;
+
+      instrumentButtons.forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-mode') === mode);
+      });
+      if (instrumentHint) instrumentHint.textContent = profileSummary(activeProfile);
+    }
+
+    instrumentButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mode = btn.getAttribute('data-mode');
+        if (mode && mode !== instrumentMode) {
+          applyInstrumentMode(mode);
+          // Buffers legen bij omschakelen: oude meetgeschiedenis hoort niet bij de nieuwe modus
+          freqHistory = [];
+          smoothedFreq = 0;
+          pendingCandidateString = null;
+          pendingCandidateCount = 0;
+        }
+      });
+    });
+
+    // Init: toon actieve modus en hints
+    applyInstrumentMode(instrumentMode);
+
     pegGroups.forEach(peg => {
       peg.addEventListener('click', () => {
         const strId = peg.getAttribute('data-string');
@@ -776,15 +903,15 @@
         gainNode = audioContext.createGain();
         gainNode.gain.value = currentGain;
 
-        // Biquad Highpass: blokkeer laag gerommel, wind en 50Hz netbrom
+        // Biquad Highpass: blokkeer laag gerommel, wind en 50Hz netbrom (freq per instrumentprofiel)
         biquadHighpass = audioContext.createBiquadFilter();
         biquadHighpass.type = 'highpass';
-        biquadHighpass.frequency.value = 65;
+        biquadHighpass.frequency.value = activeProfile.highpassHz;
 
-        // Biquad Lowpass: snijd hoge ruis en sissende boventonen boven 420 Hz af
+        // Biquad Lowpass: snijd hoge ruis en sissende boventonen af (freq per instrumentprofiel)
         biquadLowpass = audioContext.createBiquadFilter();
         biquadLowpass.type = 'lowpass';
-        biquadLowpass.frequency.value = 420;
+        biquadLowpass.frequency.value = activeProfile.lowpassHz;
 
         analyser = audioContext.createAnalyser();
         analyser.fftSize = 2048;
@@ -847,7 +974,7 @@
     }
 
     // YIN Pitch Detection Algoritme (De gouden standaard voor monophonic instrumenten)
-    function yinPitch(buffer, sampleRate, threshold = 0.15) {
+    function yinPitch(buffer, sampleRate, threshold = (activeProfile ? activeProfile.yinThreshold : 0.15)) {
       const halfSize = Math.floor(buffer.length / 2);
       const yinBuffer = new Float32Array(halfSize);
 
@@ -871,8 +998,10 @@
       }
 
       // Stap 3: Absolute threshold (vind eerste dip onder threshold)
-      const minTau = Math.floor(sampleRate / 450); // Max ~450 Hz
-      const maxTau = Math.min(Math.floor(sampleRate / 75), halfSize - 1);  // Min ~75 Hz (gitaar bereik: E2 = 82.4 Hz)
+      const profMin = activeProfile ? activeProfile.minFreq : 75;
+      const profMax = activeProfile ? activeProfile.maxFreq : 450;
+      const minTau = Math.floor(sampleRate / profMax); // Max ~450 Hz
+      const maxTau = Math.min(Math.floor(sampleRate / profMin), halfSize - 1);  // Min ~75 Hz (gitaar bereik: E2 = 82.4 Hz)
 
       let chosenTau = -1;
       for (let tau = minTau; tau <= maxTau; tau++) {
@@ -915,7 +1044,7 @@
         for (const k of checkK) {
           const subTau = Math.round(chosenTau * k);
           const subFreq = sampleRate / subTau;
-          if (subFreq >= 75 && subTau < maxTau) {
+          if (subFreq >= profMin && subTau < maxTau) {
             const wMin = Math.max(minTau, subTau - 10);
             const wMax = Math.min(maxTau, subTau + 10);
             let localMinTau = wMin;
@@ -1016,13 +1145,13 @@
       let cents = null;
       let inTune = false;
 
-      // Noise gate: bereken pitch zodra RMS boven achtergrondruis ligt
-      if (rms >= 0.007) {
+      // Noise gate: bereken pitch zodra RMS boven achtergrondruis ligt (drempel per instrumentprofiel)
+      if (rms >= activeProfile.noiseGate) {
         rawFreq = yinPitch(buffer, audioContext.sampleRate);
       }
 
       // Valideer toon: binnen bereik en YIN zuiverheidsscore voldoende
-      const isValidPitch = (rawFreq !== -1 && rawFreq >= 75 && rawFreq <= 450 && lastYinDetails.cmndfVal <= 0.22);
+      const isValidPitch = (rawFreq !== -1 && rawFreq >= activeProfile.minFreq && rawFreq <= activeProfile.maxFreq && lastYinDetails.cmndfVal <= 0.22);
 
       if (isValidPitch) {
         silenceCounter = 0;
@@ -1138,7 +1267,7 @@
       // Live Debug Recording
       if (debugRecording) {
         const t = Math.round(performance.now() - debugRecordStartTime);
-        const hasPitch = (rawFreq !== -1 && rawFreq >= 65 && rawFreq <= 450);
+        const hasPitch = (rawFreq !== -1 && rawFreq >= activeProfile.minFreq && rawFreq <= activeProfile.maxFreq);
         debugLogs.push({
           t: t,
           rms: parseFloat(rms.toFixed(4)),
@@ -1418,12 +1547,14 @@
 
     function formatDiscordReport(stats) {
       if (!stats || stats.validFrames === 0) {
-        return '🎸 **Gitaarstemmer Test:** Geen stabiele toon gedetecteerd (RMS te laag of alleen stilte).';
+        const noSignalMode = activeProfile ? ' (' + activeProfile.emoji + ' ' + activeProfile.label + ')' : '';
+        return '🎸 **Gitaarstemmer Test:**' + noSignalMode + ' Geen stabiele toon gedetecteerd (RMS te laag of alleen stilte).';
       }
+      const prof = activeProfile || INSTRUMENT_PROFILES.acoustic;
       return [
         '**🎸 Gitaarstemmer Debug Rapport**',
-        '• **Snaar:** ' + stats.dominantString + ' | **Duur:** ' + stats.duration + 's (' + stats.validFrames + '/' + stats.totalFrames + ' frames actief)',
-        '• **AudioContext:** ' + stats.sampleRate + ' Hz | **Gain:** ' + currentGain + 'x',
+        '• **Instrument:** ' + prof.emoji + ' ' + prof.label + ' | **Snaar:** ' + stats.dominantString + ' | **Duur:** ' + stats.duration + 's (' + stats.validFrames + '/' + stats.totalFrames + ' frames actief)',
+        '• **AudioContext:** ' + stats.sampleRate + ' Hz | **Gain:** ' + currentGain + 'x | **Filters:** HP ' + prof.highpassHz + ' Hz • LP ' + prof.lowpassHz + ' Hz • YIN-drempel ' + prof.yinThreshold,
         '• **Ruwe YIN Grondtoon:** Gemiddeld **' + stats.meanRaw + ' Hz** (StDev: ±' + stats.stdevRaw + ' Hz, Frame-Jitter: ' + stats.meanJitter + ' Hz)',
         '• **Na DSP Smoothing:** Gemiddeld **' + stats.meanSmooth + ' Hz** (StDev: ±' + stats.stdevSmooth + ' Hz)',
         '• **Afwijking Cents:** Gemiddeld **' + stats.meanCents + ' cents** (Bereik: ' + stats.minCents + ' tot ' + stats.maxCents + ' ct)',
