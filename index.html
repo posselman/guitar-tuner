@@ -1050,7 +1050,7 @@
           cents = Math.round(1200 * Math.log2(smoothedFreq / targetFreqVal));
           inTune = Math.abs(cents) <= 4;
           fundamentalFreq = smoothedFreq / harmonicK;
-          stringTitle.textContent = '🔒 ' + activeString.label.toUpperCase() + (harmonicK > 1 ?  : '');
+          stringTitle.textContent = '🔒 ' + activeString.label.toUpperCase() + (harmonicK > 1 ? ` (${harmonicK}e overtoon)` : '');
           noteDisplay.textContent = activeString.id;
           freqCurrent.textContent = fundamentalFreq.toFixed(1) + ' Hz';
           freqTarget.textContent = activeString.freq.toFixed(1) + ' Hz';
