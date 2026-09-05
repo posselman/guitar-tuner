@@ -389,7 +389,7 @@
   <div class="app-container">
     <header>
       <h1>🎸 Gitaar Stemmer</h1>
-      <p class="subtitle">Automatische snaardetectie & realtime microfooninput <span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:6px; background:rgba(59,130,246,0.18); border:1px solid rgba(59,130,246,0.35); color:#93c5fd; font-size:10px; font-weight:700; vertical-align:middle;">Build 20260905.3</span></p>
+      <p class="subtitle">Automatische snaardetectie & realtime microfooninput <span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:6px; background:rgba(59,130,246,0.18); border:1px solid rgba(59,130,246,0.35); color:#93c5fd; font-size:10px; font-weight:700; vertical-align:middle;">Build 20260905.4</span></p>
     </header>
 
     <!-- Headstock Visual -->
@@ -612,7 +612,7 @@
     </details>
 
     <footer style="margin-top:14px; font-size:11px; color:var(--text-dim); opacity:0.75;">
-      Versie 1.3.0 • Build 20260905.3 (Debug & Stability Diagnostics)
+      Versie 1.3.0 • Build 20260905.4 (Debug & Stability Diagnostics)
     </footer>
 
     <div id="errorBox"></div>
@@ -645,6 +645,7 @@
     let animationId = null;
 
     let currentLockedString = null;
+    let isManualLock = false;
     let silenceCounter = 0;
     let smoothedFreq = 0;
     let biquadHighpass = null;
@@ -712,11 +713,22 @@
         const strId = peg.getAttribute('data-string');
         const strObj = GUITAR_STRINGS.find(s => s.id === strId);
         if (strObj) {
-          currentLockedString = strObj;
-          updateVisualHeadstock(strObj.id, false);
-          stringTitle.textContent = 'VASTGEZET: ' + strObj.label;
-          freqTarget.textContent = strObj.freq.toFixed(1) + ' Hz';
-          noteDisplay.textContent = strObj.id;
+          if (isManualLock && currentLockedString && currentLockedString.id === strObj.id) {
+            // Klik nogmaals om handmatige lock op te heffen
+            isManualLock = false;
+            currentLockedString = null;
+            clearHeadstockVisual();
+            stringTitle.textContent = 'AUTOMATISCHE DETECTIE ACTIEF';
+            freqTarget.textContent = '-- Hz';
+            noteDisplay.textContent = '--';
+          } else {
+            isManualLock = true;
+            currentLockedString = strObj;
+            updateVisualHeadstock(strObj.id, false);
+            stringTitle.textContent = '🔒 VASTGEZET: ' + strObj.label;
+            freqTarget.textContent = strObj.freq.toFixed(1) + ' Hz';
+            noteDisplay.textContent = strObj.id;
+          }
         }
       });
     });
@@ -830,6 +842,7 @@
       vuBar.style.width = '0%';
       vuVal.textContent = '0%';
       currentLockedString = null;
+      isManualLock = false;
       clearHeadstockVisual();
     }
 
@@ -887,6 +900,31 @@
         } else {
           lastYinDetails = { cmndfVal: bestVal, tau: 0 };
           return -1;
+        }
+      }
+
+      // Stap 3b: Gitaar Harmonischen Resolutie (3e en 2e boventoon check)
+      // Vooral cruciaal voor Lage E (82 Hz) en A (110 Hz) waar smartphone microfoons
+      // de 3e harmonische (247 Hz / 330 Hz) vaak luider registreren dan de grondtoon.
+      const candFreq = sampleRate / chosenTau;
+      if (candFreq > 125 && cmndf[chosenTau] > 0.02) {
+        for (const k of [3, 2]) {
+          const subTau = Math.round(chosenTau * k);
+          if (subTau < maxTau) {
+            const wMin = Math.max(minTau, subTau - 10);
+            const wMax = Math.min(maxTau, subTau + 10);
+            let localMinTau = wMin;
+            for (let t = wMin; t <= wMax; t++) {
+              if (cmndf[t] < cmndf[localMinTau]) {
+                localMinTau = t;
+              }
+            }
+            // Als de lagere grondtoon een overtuigende dip heeft (constructieve interferentie)
+            if (cmndf[localMinTau] < cmndf[chosenTau] - 0.05 || (cmndf[localMinTau] < threshold && cmndf[localMinTau] < cmndf[chosenTau] * 0.7)) {
+              chosenTau = localMinTau;
+              break;
+            }
+          }
         }
       }
 
@@ -994,47 +1032,81 @@
             smoothedFreq = smoothedFreq * 0.70 + medianFreq * 0.30;
           }
 
-          match = detectNearestGuitarString(smoothedFreq);
+          let activeString = null;
+          let targetFreqVal = 0;
+          let fundamentalFreq = 0;
+          let harmonicK = 1;
 
-          if (match) {
-            const detectedString = match.string;
+          if (isManualLock && currentLockedString) {
+            activeString = currentLockedString;
+            let bestDiffCents = Math.abs(1200 * Math.log2(smoothedFreq / activeString.freq));
 
-            // Hysteresis / Lock-on: vereist meerdere opeenvolgende frames om van snaar te wisselen
-            if (!currentLockedString) {
-              currentLockedString = detectedString;
-              pendingCandidateString = null;
-              pendingCandidateCount = 0;
-            } else if (currentLockedString.id !== detectedString.id) {
-              if (pendingCandidateString && pendingCandidateString.id === detectedString.id) {
-                pendingCandidateCount++;
-                if (pendingCandidateCount >= STRING_SWITCH_FRAMES) {
-                  currentLockedString = detectedString;
-                  pendingCandidateString = null;
-                  pendingCandidateCount = 0;
+            // Check 2e en 3e harmonischen (vooral Lage E en A)
+            if (activeString.id === 'E2' || activeString.id === 'A2') {
+              for (const k of [2, 3]) {
+                const diffCents = Math.abs(1200 * Math.log2(smoothedFreq / (activeString.freq * k)));
+                if (diffCents < bestDiffCents) {
+                  bestDiffCents = diffCents;
+                  harmonicK = k;
                 }
-              } else {
-                pendingCandidateString = detectedString;
-                pendingCandidateCount = 1;
               }
-            } else {
-              pendingCandidateString = null;
-              pendingCandidateCount = 0;
             }
 
-            const activeString = currentLockedString;
-            const targetFreqVal = match.isOctave && (activeString.id === 'E2' || activeString.id === 'A2')
-              ? activeString.freq * 2
-              : activeString.freq;
-
+            targetFreqVal = activeString.freq * harmonicK;
             cents = Math.round(1200 * Math.log2(smoothedFreq / targetFreqVal));
             inTune = Math.abs(cents) <= 4;
+            fundamentalFreq = smoothedFreq / harmonicK;
 
-            stringTitle.textContent = activeString.label.toUpperCase();
+            stringTitle.textContent = '🔒 ' + activeString.label.toUpperCase() + (harmonicK > 1 ? ` (${harmonicK}e overtoon)` : '');
             noteDisplay.textContent = activeString.id;
-            freqCurrent.textContent = (match.isOctave ? (smoothedFreq / 2) : smoothedFreq).toFixed(1) + ' Hz';
+            freqCurrent.textContent = fundamentalFreq.toFixed(1) + ' Hz';
             freqTarget.textContent = activeString.freq.toFixed(1) + ' Hz';
             centsLabel.textContent = (cents > 0 ? '+' + cents : cents) + ' cents';
+          } else {
+            match = detectNearestGuitarString(smoothedFreq);
+            if (match) {
+              const detectedString = match.string;
+              // Hysteresis / Lock-on: vereist meerdere opeenvolgende frames om van snaar te wisselen
+              if (!currentLockedString) {
+                currentLockedString = detectedString;
+                pendingCandidateString = null;
+                pendingCandidateCount = 0;
+              } else if (currentLockedString.id !== detectedString.id) {
+                if (pendingCandidateString && pendingCandidateString.id === detectedString.id) {
+                  pendingCandidateCount++;
+                  if (pendingCandidateCount >= STRING_SWITCH_FRAMES) {
+                    currentLockedString = detectedString;
+                    pendingCandidateString = null;
+                    pendingCandidateCount = 0;
+                  }
+                } else {
+                  pendingCandidateString = detectedString;
+                  pendingCandidateCount = 1;
+                }
+              } else {
+                pendingCandidateString = null;
+                pendingCandidateCount = 0;
+              }
 
+              activeString = currentLockedString;
+              harmonicK = match.isOctave ? 2 : 1;
+              targetFreqVal = match.isOctave && (activeString.id === 'E2' || activeString.id === 'A2')
+                ? activeString.freq * 2
+                : activeString.freq;
+
+              cents = Math.round(1200 * Math.log2(smoothedFreq / targetFreqVal));
+              inTune = Math.abs(cents) <= 4;
+              fundamentalFreq = match.isOctave ? (smoothedFreq / 2) : smoothedFreq;
+
+              stringTitle.textContent = activeString.label.toUpperCase();
+              noteDisplay.textContent = activeString.id;
+              freqCurrent.textContent = fundamentalFreq.toFixed(1) + ' Hz';
+              freqTarget.textContent = activeString.freq.toFixed(1) + ' Hz';
+              centsLabel.textContent = (cents > 0 ? '+' + cents : cents) + ' cents';
+            }
+          }
+
+          if (activeString) {
             // Analoge naald-demping (EWMA) voor een rustig reagerende meter
             const clampedCents = Math.max(-50, Math.min(50, cents));
             const targetAngle = (clampedCents / 50) * 45;
