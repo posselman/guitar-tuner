@@ -389,7 +389,7 @@
   <div class="app-container">
     <header>
       <h1>🎸 Gitaar Stemmer</h1>
-      <p class="subtitle">Automatische snaardetectie & realtime microfooninput <span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:6px; background:rgba(59,130,246,0.18); border:1px solid rgba(59,130,246,0.35); color:#93c5fd; font-size:10px; font-weight:700; vertical-align:middle;">Build 20260905.1</span></p>
+      <p class="subtitle">Automatische snaardetectie & realtime microfooninput <span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:6px; background:rgba(59,130,246,0.18); border:1px solid rgba(59,130,246,0.35); color:#93c5fd; font-size:10px; font-weight:700; vertical-align:middle;">Build 20260905.2</span></p>
     </header>
 
     <!-- Headstock Visual -->
@@ -612,7 +612,7 @@
     </details>
 
     <footer style="margin-top:14px; font-size:11px; color:var(--text-dim); opacity:0.75;">
-      Versie 1.3.0 • Build 20260905.1 (Debug & Stability Diagnostics)
+      Versie 1.3.0 • Build 20260905.2 (Debug & Stability Diagnostics)
     </footer>
 
     <div id="errorBox"></div>
@@ -965,9 +965,15 @@
       vuBar.style.width = vuPercent + '%';
       vuVal.textContent = vuPercent + '%';
 
+      let rawFreq = -1;
+      let medianFreq = 0;
+      let match = null;
+      let cents = null;
+      let inTune = false;
+
       // Noise gate: start detectie bij voldoende signaalsterkte boven achtergrondruis
       if (rms >= 0.007) {
-        const rawFreq = yinPitch(buffer, audioContext.sampleRate);
+        rawFreq = yinPitch(buffer, audioContext.sampleRate);
 
         if (rawFreq !== -1 && rawFreq >= 65 && rawFreq <= 450) {
           silenceCounter = 0;
